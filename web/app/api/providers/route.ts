@@ -1,6 +1,6 @@
 // app/api/providers/route.ts
 // GET /api/providers?plan=Aetna%20Student%20Health&type=psychiatrist&before=2026-11-25
-//   optional: q, language, telehealth=1, lat, lng, limit, slots=1 (include up to 3 open slots each)
+//   optional: q, language, telehealth=1, lat, lng, radius (miles), sort=soonest|nearest, limit, slots=1
 import { NextRequest } from "next/server";
 import { searchProviders, getOpenSlots } from "@/lib/providers";
 
@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
       lat: p.get("lat") ? Number(p.get("lat")) : undefined,
       lng: p.get("lng") ? Number(p.get("lng")) : undefined,
       limit: p.get("limit") ? Number(p.get("limit")) : undefined,
+      radiusMiles: p.get("radius") ? Number(p.get("radius")) : undefined,
+      sort: p.get("sort") === "nearest" ? "nearest" : "soonest",
     });
     if (p.get("slots") !== "1") return Response.json(providers);
 

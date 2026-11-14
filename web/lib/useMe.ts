@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 
 export type Me = {
   today: string;
-  user: { user_id: number; display_name: string | null; insurance_plan: string; care_type: string };
+  user: { user_id: number; display_name: string | null; insurance_plan: string; care_type: string;
+    home_lat: number | null; home_lng: number | null; home_zip: string | null; preferred_language: string | null };
   medication: null | {
     label: string; daysLeft: number; supplyEndDate: string; refillDeadline: string; rxNeededBy: string;
     apptBy: string | null; bookApptBy: string | null; renewalReason: "no_refills" | "rx_expires" | "appointment_required" | null;

@@ -12,10 +12,14 @@ export const PLANS = [
   "Medicaid",
 ];
 
+export type Lang = "en" | "es";
+
 export const COPY = {
   appName: "Continuity",
   tagline: "Your healthcare, handled ahead of time.",
   aiDisclosure: "Continuity is an AI assistant, not a medical professional.",
+
+  nav: { profile: "Profile", providers: "Providers", home: "Home", timeline: "Timeline" },
 
   welcome: {
     heading: "Welcome to Continuity",
@@ -41,6 +45,16 @@ export const COPY = {
     planLabel: "Insurance company",
     planHelp: "Just your plan's name. We never ask for your member ID or card.",
     privacyShort: "Your information is private. We only use it to help with your care.",
+
+    language: "Language",
+    languages: { en: "English", es: "Español" },
+
+    locationTitle: "Your location",
+    locationHelp: "We use this only to find providers near you.",
+    zipLabel: "Your ZIP code",
+    useMyLocation: "Use my location",
+    locationFound: "Got it, we'll search near you.",
+    locationDenied: "We couldn't get your location. You can type your ZIP code instead.",
 
     careTitle: "Your care",
     careHelp: "Add what you take so we can tell you when to refill.",
@@ -144,6 +158,11 @@ export const COPY = {
     psychiatristsTitle: "Psychiatrists near you",
     psychiatristsSub: "Psychiatrists can prescribe and manage medication.",
     tabs: { therapist: "Therapists", psychiatrist: "Psychiatrists" },
+    sortSoonest: "Soonest",
+    sortNearest: "Nearest",
+    anyDistance: "Any distance",
+    within: (mi: number) => `Within ${mi} mi`,
+    speaksSpanish: "Speaks Spanish",
     chip: (plan: string, before: string) => `${plan || "Any plan"}${before ? ` · open before ${before}` : ""}`,
     demoNotice: "These times are examples. They aren't real openings yet.",
     inNetwork: "In your plan",
@@ -158,6 +177,7 @@ export const COPY = {
   },
 
   booking: {
+    addToCalendar: "Add to my calendar",
     title: "Request this appointment?",
     body: "We'll share your plan name with this provider when you book.",
     confirm: "Request appointment",
@@ -179,3 +199,193 @@ export const COPY = {
     error: "We couldn't book that visit. Nothing was sent. Please try again.",
   },
 };
+
+// ---------------------------------------------------------------------------
+// SPANISH DRAFT: Ivy, please review every line (tone: calm, plain, kind, never blaming).
+// Same keys as COPY above. Mood replies are keyed by the Spanish choice words.
+export const COPY_ES: typeof COPY = {
+  appName: "Continuity",
+  tagline: "Tu salud, organizada con tiempo.",
+  aiDisclosure: "Continuity es un asistente de IA, no un profesional médico.",
+
+  nav: { profile: "Perfil", providers: "Proveedores", home: "Inicio", timeline: "Plan" },
+
+  welcome: {
+    heading: "Te damos la bienvenida a Continuity",
+    sub: "Tu salud, organizada con tiempo.",
+    cards: [
+      { title: "Nunca te quedes sin tu receta", body: "Te avisamos antes de que se acabe" },
+      { title: "Encuentra profesionales cerca", body: "Terapeutas y psiquiatras cerca de ti" },
+      { title: "Citas que se ajustan a ti", body: "Según tu calendario" },
+    ],
+    start: "Empezar",
+  },
+
+  onboarding: {
+    aboutTitle: "Sobre ti",
+    aboutHelp: "Esto nos ayuda a prepararlo todo. Toma como un minuto.",
+    nameLabel: "¿Cómo quieres que te llamemos?",
+    nameHelp: "Usaremos este nombre cuando hablemos contigo en la app.",
+    phoneLabel: "Número de celular",
+    phoneHelp: "Solo lo usamos para los recordatorios que elijas y para saber que eres tú en FaceTime.",
+
+    insuranceTitle: "Seguro médico",
+    insuranceHelp: "Agrega tu plan para mostrarte citas que estén cubiertas.",
+    planLabel: "Compañía de seguro",
+    planHelp: "Solo el nombre de tu plan. Nunca te pedimos tu número de miembro ni tu tarjeta.",
+    privacyShort: "Tu información es privada. Solo la usamos para ayudarte con tu cuidado.",
+
+    language: "Idioma",
+    languages: { en: "English", es: "Español" },
+
+    locationTitle: "Tu ubicación",
+    locationHelp: "Solo la usamos para encontrar profesionales cerca de ti.",
+    zipLabel: "Tu código postal",
+    useMyLocation: "Usar mi ubicación",
+    locationFound: "Listo, buscaremos cerca de ti.",
+    locationDenied: "No pudimos obtener tu ubicación. Puedes escribir tu código postal.",
+
+    careTitle: "Tu cuidado",
+    careHelp: "Agrega lo que tomas para avisarte cuándo surtir tu receta.",
+    careTypeLabel: "¿Qué cuidado quieres mantener al día?",
+    careTypes: { psychiatry: "Medicamento", therapy: "Terapia", both: "Ambos" },
+    medLabel: "Medicamento",
+    medHelp: "Puedes usar un apodo. Lo mantenemos en privado.",
+    daysLeftLabel: "Días que te quedan",
+    refillsLabel: "Resurtidos que te quedan",
+    expiresLabel: "Vencimiento de la receta (si lo sabes)",
+    needsApptLabel: "Mi médico necesita verme antes de renovar",
+    leadLabel: "¿Con cuántos días de anticipación da citas tu psiquiatra?",
+    lastSessionLabel: "Última sesión de terapia",
+    cadenceLabel: "¿Cada cuánto se reúnen?",
+    cadences: { 7: "Cada semana", 14: "Cada 2 semanas", 30: "Cada mes" } as Record<number, string>,
+
+    continue: "Continuar",
+    back: "Atrás",
+    submit: "Ver mi plan",
+    saving: "Guardando tus respuestas…",
+    error: "Algo salió mal de nuestro lado. Inténtalo de nuevo en un momento.",
+    missing: (field: string) => `Nos falta un poco de información. Por favor completa ${field}.`,
+  },
+
+  home: {
+    greeting: (name: string) => `¡Hola, ${name}!`,
+    sub: "Esto es lo que viene.",
+    facetime: "FaceTime con Continuity",
+    facetimeHelp: "Llama para revisar tu plan o agendar una cita.",
+    nextVisit: "Próxima cita",
+    confirmed: "Confirmada",
+    noVisits: "Aún no tienes citas. Busquemos una que se ajuste a tu semana.",
+    findProvider: "Buscar un profesional",
+    refillAlert: "Aviso de resurtido",
+    daysLeft: (label: string, n: number) => `${label}: ${n} ${n === 1 ? "día" : "días"} restantes`,
+    runsOut: (date: string) => `Se acaba el ${date}`,
+    requestRefill: "Pedir resurtido",
+    refillSent: "Solicitud de resurtido enviada (demo).",
+    scheduleBy: "Agenda antes del",
+    scheduleByLine: (date: string) => `${date} · próxima cita de psiquiatría`,
+    therapyBy: (date: string) => `${date} · próxima sesión de terapia`,
+    noMeds: "Aún no hay medicamentos. Agrega uno y te avisaremos cuándo resurtir.",
+    setup: "Crear mi plan",
+  },
+
+  mood: {
+    question: "¿Cómo te sientes hoy?",
+    choices: ["Mal", "Regular", "Bien", "Muy bien", "Genial"],
+    replies: {
+      Mal: "Gracias por contarnos. Suena difícil. ¿Quieres agendar una cita o hablar con alguien ahora?",
+      Regular: "Gracias por contarnos. Aquí estamos si nos necesitas.",
+      Bien: "Gracias por contarnos. Aquí estamos si nos necesitas.",
+      "Muy bien": "¡Qué bueno! Gracias por contarnos.",
+      Genial: "¡Qué bueno! Gracias por contarnos.",
+    } as Record<string, string>,
+    crisis: "Si estás en EE. UU. y en crisis, llama o envía un mensaje al 988 en cualquier momento (hay ayuda en español).",
+  },
+
+  timeline: {
+    eyebrow: "Plan de resurtido",
+    title: "Qué hacer y cuándo",
+    sub: "Tus citas, planeadas según tus resurtidos.",
+    nextStep: "Siguiente paso",
+    today: "Estás aquí",
+    visitBooked: (provider: string) => `Cita con ${provider}`,
+    rxNeededBy: "Receta a tu farmacia",
+    rxNeededByBody: "Tu médico envía la renovación antes de esta fecha.",
+    refillDeadline: "Resurtido en mano",
+    supplyEnd: (label: string) => `Se acaba ${label}`,
+    supplyEndBody: "Tu resurtido debería estar listo para entonces.",
+    bookBy: "Agenda tu próxima cita de psiquiatría",
+    bookByBody: (label: string) => `Así ${label} sigue al día.`,
+    therapyBy: "Próxima sesión de terapia",
+    therapyBookBy: "Agenda tu próxima sesión de terapia",
+    findPsychiatrist: "Buscar un psiquiatra",
+    clear: "No hay nada pendiente. Te avisaremos cuando haya algo.",
+  },
+
+  actions: {
+    book_today: "Tu próxima cita aún no está agendada. Busquemos una hoy.",
+    book_appointment: "Tu próxima cita aún no está agendada. ¿Quieres que busquemos una?",
+    request_refill: "Pedir tu resurtido ahora mantiene todo en orden.",
+    all_set: "Tienes suficiente medicamento y tus citas están planeadas.",
+    visit_booked: "Tu cita está agendada. Tu resurtido va bien.",
+  },
+
+  status: { green: "Todo en orden", yellow: "Se acerca pronto", red: "Resolvámoslo hoy" },
+
+  tags: { confirmed: "Confirmada", needsAction: "Requiere acción", timeSensitive: "Urgente", notBooked: "Sin agendar" },
+
+  renewalReasons: {
+    no_refills: "Ya no te quedan resurtidos, así que necesitarás una cita para renovar.",
+    rx_expires: "Tu receta vence antes de tu próximo resurtido.",
+    appointment_required: "Tu médico necesita verte antes de renovar.",
+  },
+
+  results: {
+    therapistsTitle: "Terapeutas cerca de ti",
+    therapistsSub: "Coinciden con tu seguro.",
+    psychiatristsTitle: "Psiquiatras cerca de ti",
+    psychiatristsSub: "Los psiquiatras pueden recetar y ajustar medicamentos.",
+    tabs: { therapist: "Terapeutas", psychiatrist: "Psiquiatras" },
+    sortSoonest: "Más pronto",
+    sortNearest: "Más cerca",
+    anyDistance: "Cualquier distancia",
+    within: (mi: number) => `A ${mi} millas`,
+    speaksSpanish: "Habla español",
+    chip: (plan: string, before: string) => `${plan || "Cualquier plan"}${before ? ` · disponible antes del ${before}` : ""}`,
+    demoNotice: "Estos horarios son ejemplos. Todavía no son citas reales.",
+    inNetwork: "En tu plan",
+    outOfNetwork: "Fuera de tu plan (puede costar más)",
+    telehealth: "Telesalud",
+    videoShort: "video",
+    milesAway: "mi",
+    nextOpen: "Próximos horarios",
+    loading: "Buscando profesionales cerca de ti…",
+    empty: "No hay horarios antes de tu fecha límite. Prueba otro tipo de profesional o una fecha más tarde.",
+    error: "Algo salió mal de nuestro lado. Inténtalo de nuevo en un momento.",
+  },
+
+  booking: {
+    addToCalendar: "Agregar a mi calendario",
+    title: "¿Solicitar esta cita?",
+    body: "Compartiremos el nombre de tu plan con este profesional cuando agendes.",
+    confirm: "Solicitar cita",
+    saving: "Agendando tu cita. Tarda unos segundos.",
+    doneTitle: "Tu cita está agendada",
+    doneBody: "Tu plan de cuidado está actualizado.",
+    labels: { date: "Fecha", time: "Hora", type: "Tipo de cita", length: "Duración" },
+    video: "Telesalud",
+    inPerson: "En persona",
+    minutes: "min",
+    aheadTitle: "A tiempo antes de tu resurtido",
+    aheadBody: (label: string, date: string, days: number) => `${label} se acaba el ${date}, ${days} ${days === 1 ? "día" : "días"} después.`,
+    reminders: "Recordatorios: 24 horas y 1 hora antes",
+    done: "Listo",
+    takenTitle: "Ese horario se acaba de ocupar",
+    takenBody: "Alguien más tomó ese horario. Elige otro.",
+    pickAnother: "Ver otros horarios",
+    loading: "Preparando todo…",
+    error: "No pudimos agendar esa cita. No se envió nada. Inténtalo de nuevo.",
+  },
+};
+
+export const copyFor = (lang: Lang) => (lang === "es" ? COPY_ES : COPY);

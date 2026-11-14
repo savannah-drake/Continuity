@@ -1,6 +1,8 @@
+"use client";
 // components/ui.tsx
 // Shared building blocks from Ivy's style guide: cards, pill buttons, status pills, eyebrows, progress.
 import Link from "next/link";
+import { useCopy } from "@/lib/i18n";
 import type { ReactNode, ButtonHTMLAttributes } from "react";
 
 export function Screen({ children, nav = false }: { children: ReactNode; nav?: boolean }) {
@@ -95,6 +97,7 @@ export function Field({ label, help, children }: { label: string; help?: string;
 export const inputClass = "w-full rounded-[10px] border border-line bg-white px-3 py-2.5 text-[15px] text-navy outline-none focus:border-brand";
 
 export function BottomNav({ active }: { active: "home" | "providers" | "timeline" | "profile" }) {
+  const N = useCopy().nav;
   const item = (key: typeof active, href: string, label: string, icon: string) => (
     <Link href={href} className={`flex flex-col items-center gap-0.5 text-[10px] font-bold ${active === key ? "text-brand" : "text-muted"}`}>
       <span className="text-lg leading-none">{icon}</span>{label}
@@ -102,10 +105,10 @@ export function BottomNav({ active }: { active: "home" | "providers" | "timeline
   );
   return (
     <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md items-center justify-around border-t border-line bg-white px-6 py-3">
-      {item("profile", "/onboarding", "Profile", "◯")}
-      {item("providers", "/providers", "Providers", "⌖")}
-      {item("home", "/", "Home", "⌂")}
-      {item("timeline", "/timeline", "Timeline", "☰")}
+      {item("profile", "/onboarding", N.profile, "◯")}
+      {item("providers", "/providers", N.providers, "⌖")}
+      {item("home", "/", N.home, "⌂")}
+      {item("timeline", "/timeline", N.timeline, "☰")}
     </nav>
   );
 }

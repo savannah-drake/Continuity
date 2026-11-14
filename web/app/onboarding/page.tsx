@@ -1,16 +1,19 @@
-// app/onboarding/page.tsx: 3-step setup (About you → Insurance → Your care), styled from Ivy's Onboarding mockup.
-// Calendar (step 4 in the mockup) comes with PB-27. On finish, saves and goes to Home.
+// app/onboarding/page.tsx: 4 steps (About you → Insurance → Your care → Your location), Ivy's Onboarding mockup.
+// Language (English/Español) can be switched on step 1; location saves home_lat/home_lng for Typesense geo search.
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { COPY, PLANS } from "@/lib/copy";
+import { PLANS } from "@/lib/copy";
+import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { Screen, Title, Progress, Field, inputClass, Button, Notice, Card } from "@/components/ui";
 
-const C = COPY.onboarding;
 type CareType = "psychiatry" | "therapy" | "both";
-const TOTAL = 3;
+const TOTAL = 4;
 
 export default function Onboarding() {
+  const COPY = useCopy();
+  const C = COPY.onboarding;
+  const lang = useLang();
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState("");
@@ -25,6 +28,9 @@ export default function Onboarding() {
   const [lead, setLead] = useState(14);
   const [lastSession, setLastSession] = useState("");
   const [cadence, setCadence] = useState(14);
+  const [zip, setZip] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locNote, setLocNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +43,16 @@ export default function Onboarding() {
     setStep(step + 1);
   }
 
+  function useMyLocation() {
+    setLocNote(null);
+    if (!navigator.geolocation) return setLocNote(C.locationDenied);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocNote(C.locationFound); },
+      () => setLocNote(C.locationDenied),
+      { enableHighAccuracy: false, timeout: 8000 },
+    );
+  }
+
   async function submit() {
     setSaving(true); setError(null);
     try {
@@ -45,8 +61,11 @@ export default function Onboarding() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName, phone, insurancePlan, careType,
+          preferredLanguage: lang,
+          homeZip: zip || undefined,
+          homeLat: coords?.lat, homeLng: coords?.lng,
           medication: showMed ? {
-            label: medLabel || "Your medication", daysSupplyRemaining: daysLeft,
+            label: medLabel || (lang === "es" ? "Tu medicamento" : "Your medication"), daysSupplyRemaining: daysLeft,
             refillsRemaining: refills, rxExpiresOn: expires || null,
             requiresAppointmentForRenewal: needsAppt, bookingLeadDays: lead,
           } : undefined,
@@ -71,6 +90,16 @@ export default function Onboarding() {
         <>
           <Title sub={C.aboutHelp}>{C.aboutTitle}</Title>
           <div className="space-y-4">
+            <Field label={C.language}>
+              <div className="flex rounded-full bg-mist p-1">
+                {(["en", "es"] as const).map((l) => (
+                  <button type="button" key={l} onClick={() => setLang(l)}
+                    className={`flex-1 rounded-full py-2 text-sm font-bold ${lang === l ? "bg-brand text-white" : "text-navy"}`}>
+                    {C.languages[l]}
+                  </button>
+                ))}
+              </div>
+            </Field>
             <Field label={C.nameLabel} help={C.nameHelp}>
               <input className={inputClass} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Maya" />
             </Field>
@@ -145,6 +174,21 @@ export default function Onboarding() {
               </Field>
             </Card>
           )}
+        </>
+      )}
+
+      {step === 4 && (
+        <>
+          <Title sub={C.locationHelp}>{C.locationTitle}</Title>
+          <div className="space-y-4">
+            <Button kind="secondary" type="button" onClick={useMyLocation}>{C.useMyLocation}</Button>
+            <Field label={C.zipLabel}>
+              <input className={inputClass} inputMode="numeric" maxLength={5} value={zip}
+                onChange={(e) => setZip(e.target.value.replace(/\D/g, ""))} placeholder="30322" />
+            </Field>
+            {locNote && <p className="text-sm text-muted">{locNote}</p>}
+          </div>
+          <div className="mt-4"><Notice>{C.privacyShort}</Notice></div>
         </>
       )}
 

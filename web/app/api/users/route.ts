@@ -10,6 +10,10 @@ type Body = {
   phone: string;
   insurancePlan: string;
   careType: "psychiatry" | "therapy" | "both";
+  preferredLanguage?: "en" | "es";
+  homeZip?: string;
+  homeLat?: number;
+  homeLng?: number;
   medication?: {
     label: string;
     daysSupplyRemaining: number;
@@ -21,6 +25,18 @@ type Body = {
   therapy?: { lastSessionDate: string; cadenceDays: number };
 };
 
+// ZIP -> lat/lng with the free Zippopotam.us API (no key). Falls back to Emory's campus.
+const EMORY = { lat: 33.7925, lng: -84.324 };
+async function zipToCoords(zip?: string) {
+  if (!zip || !/^\d{5}$/.test(zip)) return null;
+  try {
+    const res = await fetch(`https://api.zippopotam.us/us/${zip}`, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const place = (await res.json()).places?.[0];
+    return place ? { lat: Number(place.latitude), lng: Number(place.longitude) } : null;
+  } catch { return null; }
+}
+
 export async function POST(req: Request) {
   const b = (await req.json()) as Body;
   if (!b.phone || !b.insurancePlan || !b.careType) {
@@ -28,17 +44,21 @@ export async function POST(req: Request) {
   }
 
   const today = todayET();
+  const coords = (b.homeLat != null && b.homeLng != null)
+    ? { lat: b.homeLat, lng: b.homeLng }
+    : (await zipToCoords(b.homeZip)) ?? EMORY;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
     const u = await client.query(
-`INSERT INTO users (phone, display_name, insurance_plan, care_type, last_therapy_session, therapy_cadence_days)
-VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (phone) DO UPDATE SET display_name = EXCLUDED.display_name, insurance_plan = EXCLUDED.insurance_plan, care_type = EXCLUDED.care_type, last_therapy_session = EXCLUDED.last_therapy_session, therapy_cadence_days = EXCLUDED.therapy_cadence_days
+`INSERT INTO users (phone, display_name, insurance_plan, care_type, last_therapy_session, therapy_cadence_days, preferred_language, home_zip, home_lat, home_lng)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (phone) DO UPDATE SET display_name = EXCLUDED.display_name, insurance_plan = EXCLUDED.insurance_plan, care_type = EXCLUDED.care_type, last_therapy_session = EXCLUDED.last_therapy_session, therapy_cadence_days = EXCLUDED.therapy_cadence_days, preferred_language = EXCLUDED.preferred_language, home_zip = EXCLUDED.home_zip, home_lat = EXCLUDED.home_lat, home_lng = EXCLUDED.home_lng
 RETURNING user_id`,
       [b.phone, b.displayName ?? null, b.insurancePlan, b.careType,
-       b.therapy?.lastSessionDate ?? null, b.therapy?.cadenceDays ?? null],
+       b.therapy?.lastSessionDate ?? null, b.therapy?.cadenceDays ?? null,
+       b.preferredLanguage ?? "en", b.homeZip ?? null, coords.lat, coords.lng],
     );
     const userId: number = u.rows[0].user_id;
 

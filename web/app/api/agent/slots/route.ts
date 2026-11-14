@@ -1,5 +1,5 @@
 // app/api/agent/slots/route.ts
-// GET /api/agent/slots?userId=1&type=psychiatrist  (optional: before=YYYY-MM-DD, telehealth=1)
+// GET /api/agent/slots?userId=1&type=psychiatrist  (optional: before=YYYY-MM-DD, telehealth=1, language=Spanish)
 // -> up to 3 in-network openings before the caller's deadline, soonest first, phrased for speaking.
 import { NextRequest } from "next/server";
 import { getMe } from "@/lib/me";
@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
   const providers = await searchProviders({
     plan: me.user.insurance_plan, type, before: before ?? undefined,
     telehealth: p.get("telehealth") === "1", limit: 8,
+    language: p.get("language") || undefined,
+    lat: me.user.home_lat ?? undefined, lng: me.user.home_lng ?? undefined,
     syntheticOnly: true, // never offer real NPI doctors fake times out loud
   });
   const slots = await getOpenSlots(providers.map((x: any) => x.provider_id), before ?? undefined, 2);

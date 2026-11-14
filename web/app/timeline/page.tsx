@@ -1,10 +1,9 @@
 // app/timeline/page.tsx: the care chain, from Ivy's "Refill timeline / When to schedule" mockup.
 "use client";
-import { COPY } from "@/lib/copy";
+import { useCopy } from "@/lib/i18n";
 import { useMe, fmtDay, isoDay, fmtTime, providersHref } from "@/lib/useMe";
 import { Screen, Card, Eyebrow, Pill, ButtonLink, BottomNav } from "@/components/ui";
 
-const T = COPY.timeline;
 type Dot = "today" | "confirmed" | "action" | "end" | "later";
 const dotColor: Record<Dot, string> = {
   today: "border-brand", confirmed: "border-forest", action: "border-attn", end: "border-coral", later: "border-muted",
@@ -12,6 +11,8 @@ const dotColor: Record<Dot, string> = {
 type Step = { date: string; title: string; body?: string; dot: Dot; tag?: { text: string; tone: "mint" | "attn" } };
 
 export default function TimelinePage() {
+  const COPY = useCopy();
+  const T = COPY.timeline;
   const { me, state } = useMe();
   if (state === "loading") return <Screen><p className="text-muted">{COPY.booking.loading}</p></Screen>;
   if (!me) return <Screen><p className="mb-4 text-muted">{T.clear}</p><ButtonLink href="/onboarding">{COPY.home.setup}</ButtonLink></Screen>;

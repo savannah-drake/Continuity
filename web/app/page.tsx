@@ -2,15 +2,17 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { COPY } from "@/lib/copy";
+import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { useMe, fmtShort, fmtSlot, providersHref } from "@/lib/useMe";
 import { Screen, Card, Eyebrow, Pill, ButtonLink, Button, BottomNav, Notice } from "@/components/ui";
 
-const H = COPY.home;
 // The Chert line's number, set in .env.local / Vercel as NEXT_PUBLIC_CHERT_FACETIME_NUMBER (e.g. +14045550123)
 const FACETIME_NUMBER = process.env.NEXT_PUBLIC_CHERT_FACETIME_NUMBER;
 
 export default function Home() {
+  const COPY = useCopy();
+  const lang = useLang();
+  const H = COPY.home;
   const { me, state } = useMe();
   const [mood, setMood] = useState<string | null>(null);
   const [refillSent, setRefillSent] = useState(false);
@@ -32,7 +34,13 @@ export default function Home() {
         <span aria-hidden>▶</span> {H.facetime}
       </a>
 
-      <h1 className="text-[26px] font-bold text-navy">{H.greeting(name)}</h1>
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="text-[26px] font-bold text-navy">{H.greeting(name)}</h1>
+        <button onClick={() => setLang(lang === "en" ? "es" : "en")}
+          className="mt-1 rounded-full border border-line bg-white px-3 py-1 text-xs font-bold text-navy">
+          {lang === "en" ? "Español" : "English"}
+        </button>
+      </div>
       <p className="mb-5 text-sm text-muted">{todayLabel} · {H.sub}</p>
 
       <div className="space-y-3">
@@ -126,7 +134,7 @@ export default function Home() {
           {mood && (
             <div className="mt-3 rounded-xl bg-white p-3 text-sm text-navy border border-line">
               <p>{COPY.mood.replies[mood]}</p>
-              {mood === "Low" && <p className="mt-2 font-bold">{COPY.mood.crisis}</p>}
+              {mood === COPY.mood.choices[0] && <p className="mt-2 font-bold">{COPY.mood.crisis}</p>}
             </div>
           )}
         </div>
@@ -139,6 +147,7 @@ export default function Home() {
 }
 
 function Welcome() {
+  const COPY = useCopy();
   const W = COPY.welcome;
   return (
     <Screen>

@@ -38,6 +38,8 @@ How to work:
 - After book_appointment returns, tell them it's booked in one sentence (provider, day, time).
   If it says the time was taken, offer the next option.
 - Use plain words: "Monday, November sixteenth at nine AM", never IDs or codes.
+- Language: reply in the language the caller speaks (English or Spanish). If they speak Spanish, keep
+  speaking Spanish, and if they want a Spanish-speaking provider, pass language: "Spanish" to find_appointments.
 
 Style and safety:
 - One or two short, plain sentences per reply. Ask one question at a time.
@@ -47,7 +49,7 @@ Style and safety:
 - If someone sounds like they are in crisis, tell them they can call or text 988 any time, right now.
 - Don't say medication names out loud unless the caller says them first; say "your medication".`;
 
-const greeting = "Greet the caller by name if you know it, in one short sentence: say you are Continuity, an AI care assistant, and ask how you can help with their care today.";
+const greeting = "Greet the caller by name if you know it, in one short sentence: say you are Continuity, an AI care assistant, and ask how you can help with their care today. Add: 'También hablo español.'";
 
 // Tools are built per call so each call remembers the options it offered ("option 1" -> slot_id).
 function makeTools() {
@@ -63,9 +65,10 @@ function makeTools() {
       parameters: z.object({
         provider_type: z.enum(['psychiatrist', 'therapist']).describe('psychiatrist for medication visits, therapist for therapy'),
         video_only: z.boolean().optional().describe('true if the caller only wants video visits'),
+        language: z.string().optional().describe('e.g. "Spanish" if they want a provider who speaks it'),
       }),
-      execute: async ({ provider_type, video_only }) => {
-        const data = await api(`/api/agent/slots?userId=${USER_ID}&type=${provider_type}${video_only ? '&telehealth=1' : ''}`);
+      execute: async ({ provider_type, video_only, language }) => {
+        const data = await api(`/api/agent/slots?userId=${USER_ID}&type=${provider_type}${video_only ? '&telehealth=1' : ''}${language ? `&language=${encodeURIComponent(language)}` : ''}`);
         lastOptions = data.options || [];
         return {
           deadline: data.deadline,

@@ -1,21 +1,23 @@
-// app/providers/page.tsx: "Therapists / Psychiatrists nearby", from Ivy's Provider Care mockup.
+// app/providers/page.tsx: "Therapists / Psychiatrists nearby" (Ivy's Provider Care mockup)
+// + Typesense geo (distance from the user, radius filter, soonest/nearest) + language filter.
 // URL: /providers?plan=Aetna%20Student%20Health&type=psychiatrist&before=2026-11-25
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { COPY } from "@/lib/copy";
+import { useCopy, useLang } from "@/lib/i18n";
 import { useMe, fmtSlot, fmtShort } from "@/lib/useMe";
 import { Screen, Card, Pill, Avatar, Notice, BottomNav, Eyebrow } from "@/components/ui";
 
 type Slot = { slot_id: number; slot_start: string; duration_min: number; telehealth: boolean };
 type Provider = {
-  provider_id: number; provider_name: string; specialty: string; address: string;
+  provider_id: number; provider_name: string; specialty: string; address: string; languages: string[];
   insurance_plans: string[]; telehealth: boolean; distance_miles: number; slots: Slot[];
 };
-const R = COPY.results;
+const RADII = [0, 5, 10, 25]; // 0 = any distance
 
 export default function ProvidersPage() {
+  const R = useCopy().results;
   return (
     <Suspense fallback={<Screen><p className="text-muted">{R.loading}</p></Screen>}>
       <Results />
@@ -23,7 +25,18 @@ export default function ProvidersPage() {
   );
 }
 
+function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick}
+      className={`rounded-full px-3 py-1 text-xs font-bold ${on ? "bg-navy text-white" : "border border-line bg-white text-navy"}`}>
+      {children}
+    </button>
+  );
+}
+
 function Results() {
+  const R = useCopy().results;
+  const lang = useLang();
   const params = useSearchParams();
   const router = useRouter();
   const { me } = useMe();
@@ -31,17 +44,31 @@ function Results() {
   const type = (params.get("type") as "therapist" | "psychiatrist") || "psychiatrist";
   const before = params.get("before") ?? "";
 
+  const [sort, setSort] = useState<"soonest" | "nearest">("soonest");
+  const [radius, setRadius] = useState(0);
+  const [spanish, setSpanish] = useState(false);
+  useEffect(() => { if (lang === "es") setSpanish(true); }, [lang]);
+
+  const lat = me?.user.home_lat ?? null;
+  const lng = me?.user.home_lng ?? null;
+
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     setProviders(null); setError(false);
-    const qs = new URLSearchParams({ type, slots: "1", ...(plan ? { plan } : {}), ...(before ? { before } : {}) });
+    const qs = new URLSearchParams({
+      type, slots: "1", sort,
+      ...(plan ? { plan } : {}), ...(before ? { before } : {}),
+      ...(radius ? { radius: String(radius) } : {}),
+      ...(spanish ? { language: "Spanish" } : {}),
+      ...(lat !== null && lng !== null ? { lat: String(lat), lng: String(lng) } : {}),
+    });
     fetch(`/api/providers?${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setProviders)
       .catch(() => setError(true));
-  }, [plan, type, before]);
+  }, [plan, type, before, sort, radius, spanish, lat, lng]);
 
   const switchTab = (t: string) =>
     router.replace(`/providers?${new URLSearchParams({ type: t, ...(plan ? { plan } : {}), ...(before ? { before } : {}) })}`);
@@ -55,12 +82,24 @@ function Results() {
         {R.chip(plan, before ? fmtShort(before) : "")}
       </p>
 
-      <div className="mb-4 flex rounded-full bg-mist p-1">
+      <div className="mb-3 flex rounded-full bg-mist p-1">
         {(["therapist", "psychiatrist"] as const).map((t) => (
           <button key={t} onClick={() => switchTab(t)}
             className={`flex-1 rounded-full py-2 text-sm font-bold ${type === t ? "bg-brand text-white" : "text-navy"}`}>
             {R.tabs[t]}
           </button>
+        ))}
+      </div>
+
+      {/* Typesense geo sort + geo filter + language facet */}
+      <div className="mb-2 flex flex-wrap gap-2">
+        <Chip on={sort === "soonest"} onClick={() => setSort("soonest")}>{R.sortSoonest}</Chip>
+        <Chip on={sort === "nearest"} onClick={() => setSort("nearest")}>{R.sortNearest}</Chip>
+        <Chip on={spanish} onClick={() => setSpanish(!spanish)}>{R.speaksSpanish}</Chip>
+      </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {RADII.map((mi) => (
+          <Chip key={mi} on={radius === mi} onClick={() => setRadius(mi)}>{mi ? R.within(mi) : R.anyDistance}</Chip>
         ))}
       </div>
 
@@ -73,6 +112,7 @@ function Results() {
       <div className="space-y-3">
         {providers?.map((p) => {
           const inPlan = plan && p.insurance_plans.includes(plan);
+          const speaks = (p.languages ?? []).filter((l) => l !== "English");
           return (
             <Card key={p.provider_id}>
               <div className="flex gap-3">
@@ -80,10 +120,10 @@ function Results() {
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-navy">{p.provider_name}</p>
                   <p className="text-xs text-muted">{p.specialty}{p.telehealth ? ` · ${R.telehealth}` : ""}</p>
-                  <p className="text-xs text-muted">{p.distance_miles} {R.milesAway}</p>
+                  <p className="text-xs text-muted">{p.distance_miles} {R.milesAway}{speaks.length ? ` · ${speaks.join(", ")}` : ""}</p>
                 </div>
               </div>
-              <div className="mt-2 flex items-center justify-between">
+              <div className="mt-2">
                 <Pill tone={inPlan ? "mint" : "attn"}>{inPlan ? R.inNetwork : R.outOfNetwork}</Pill>
               </div>
               {p.slots.length > 0 && (
