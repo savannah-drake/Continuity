@@ -1,33 +1,23 @@
-// app/providers/page.tsx
-// In-network providers with an opening before your deadline.
+// app/providers/page.tsx: "Therapists / Psychiatrists nearby", from Ivy's Provider Care mockup.
 // URL: /providers?plan=Aetna%20Student%20Health&type=psychiatrist&before=2026-11-25
-// Plain styling for now; Ivy's layout replaces it. Words come from lib/copy.ts.
 "use client";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { COPY } from "@/lib/copy";
+import { useMe, fmtSlot, fmtShort } from "@/lib/useMe";
+import { Screen, Card, Pill, Avatar, Notice, BottomNav, Eyebrow } from "@/components/ui";
 
 type Slot = { slot_id: number; slot_start: string; duration_min: number; telehealth: boolean };
 type Provider = {
   provider_id: number; provider_name: string; specialty: string; address: string;
   insurance_plans: string[]; telehealth: boolean; distance_miles: number; slots: Slot[];
 };
-
 const R = COPY.results;
-
-const fmtSlot = (iso: string) =>
-  new Date(iso).toLocaleString("en-US", {
-    weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-    timeZone: "America/New_York",
-  });
-
-const fmtDate = (d: string) =>
-  new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
 export default function ProvidersPage() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-2xl p-6">{R.loading}</main>}>
+    <Suspense fallback={<Screen><p className="text-muted">{R.loading}</p></Screen>}>
       <Results />
     </Suspense>
   );
@@ -35,61 +25,85 @@ export default function ProvidersPage() {
 
 function Results() {
   const params = useSearchParams();
-  const plan = params.get("plan") ?? "";
-  const type = params.get("type") ?? "";
+  const router = useRouter();
+  const { me } = useMe();
+  const plan = params.get("plan") || me?.user.insurance_plan || "";
+  const type = (params.get("type") as "therapist" | "psychiatrist") || "psychiatrist";
   const before = params.get("before") ?? "";
 
   const [providers, setProviders] = useState<Provider[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    const qs = new URLSearchParams({ plan, type, before, slots: "1" });
+    setProviders(null); setError(false);
+    const qs = new URLSearchParams({ type, slots: "1", ...(plan ? { plan } : {}), ...(before ? { before } : {}) });
     fetch(`/api/providers?${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setProviders)
       .catch(() => setError(true));
   }, [plan, type, before]);
 
+  const switchTab = (t: string) =>
+    router.replace(`/providers?${new URLSearchParams({ type: t, ...(plan ? { plan } : {}), ...(before ? { before } : {}) })}`);
+
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <h1 className="text-2xl font-semibold">{R.title}</h1>
-      <p className="text-gray-600">
-        {R.subtitle(plan, before ? fmtDate(before) : "")}
+    <Screen nav>
+      <h1 className="text-[26px] font-bold text-navy">{type === "therapist" ? R.therapistsTitle : R.psychiatristsTitle}</h1>
+      <p className="mb-4 text-sm text-muted">{type === "therapist" ? R.therapistsSub : R.psychiatristsSub}</p>
+
+      <p className="mb-3 rounded-full bg-mist px-4 py-2 text-center text-xs font-bold text-navy">
+        {R.chip(plan, before ? fmtShort(before) : "")}
       </p>
-      <p className="mt-2 mb-6 rounded-lg bg-gray-100 px-3 py-2 text-xs text-gray-600">{R.demoNotice}</p>
 
-      {error && <p className="text-red-600">{R.error}</p>}
-      {!providers && !error && <p>{R.loading}</p>}
-      {providers?.length === 0 && <p className="rounded-xl border p-4">{R.empty}</p>}
-
-      <div className="space-y-4">
-        {providers?.map((p) => (
-          <article key={p.provider_id} className="rounded-xl border p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-semibold">{p.provider_name}</h2>
-                <p className="text-sm text-gray-600">{p.specialty}</p>
-                <p className="text-sm text-gray-500">{p.address} · {p.distance_miles} {R.milesAway}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1 text-xs">
-                {plan && p.insurance_plans.includes(plan) && (
-                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-800">{R.inNetwork}</span>
-                )}
-                {p.telehealth && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">{R.telehealth}</span>}
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {p.slots.map((s) => (
-                <Link key={s.slot_id} href={`/book/${s.slot_id}`}
-                  className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50">
-                  {fmtSlot(s.slot_start)}{s.telehealth ? ` · ${R.videoShort}` : ""}
-                </Link>
-              ))}
-            </div>
-          </article>
+      <div className="mb-4 flex rounded-full bg-mist p-1">
+        {(["therapist", "psychiatrist"] as const).map((t) => (
+          <button key={t} onClick={() => switchTab(t)}
+            className={`flex-1 rounded-full py-2 text-sm font-bold ${type === t ? "bg-brand text-white" : "text-navy"}`}>
+            {R.tabs[t]}
+          </button>
         ))}
       </div>
-    </main>
+
+      <div className="mb-4"><Notice>{R.demoNotice}</Notice></div>
+
+      {error && <p className="text-sm text-muted">{R.error}</p>}
+      {!providers && !error && <p className="text-sm text-muted">{R.loading}</p>}
+      {providers?.length === 0 && <Card><p className="text-sm text-muted">{R.empty}</p></Card>}
+
+      <div className="space-y-3">
+        {providers?.map((p) => {
+          const inPlan = plan && p.insurance_plans.includes(plan);
+          return (
+            <Card key={p.provider_id}>
+              <div className="flex gap-3">
+                <Avatar name={p.provider_name} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-navy">{p.provider_name}</p>
+                  <p className="text-xs text-muted">{p.specialty}{p.telehealth ? ` · ${R.telehealth}` : ""}</p>
+                  <p className="text-xs text-muted">{p.distance_miles} {R.milesAway}</p>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <Pill tone={inPlan ? "mint" : "attn"}>{inPlan ? R.inNetwork : R.outOfNetwork}</Pill>
+              </div>
+              {p.slots.length > 0 && (
+                <>
+                  <Eyebrow className="mt-3 mb-1.5 !text-muted">{R.nextOpen}</Eyebrow>
+                  <div className="flex flex-wrap gap-2">
+                    {p.slots.map((s) => (
+                      <Link key={s.slot_id} href={`/book/${s.slot_id}`}
+                        className="rounded-full border-2 border-brand px-3 py-1 text-xs font-bold text-brand hover:bg-mist/50">
+                        {fmtSlot(s.slot_start)}{s.telehealth ? ` · ${R.videoShort}` : ""}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+      <BottomNav active="providers" />
+    </Screen>
   );
 }

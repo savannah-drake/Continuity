@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Continuity brand kit (Ivy). Use these as Tailwind classes: bg-brand, text-navy, border-line, bg-attn-tint… */
+@theme {
+  --color-brand: #5AA9D8;       /* Sky Blue: primary buttons, active */
+  --color-navy: #24506E;        /* headings, key text */
+  --color-muted: #5F8197;       /* Slate: secondary text */
+  --color-mist: #DCEEF9;        /* icon wells, inactive */
+  --color-canvas: #EEF7FD;      /* page background */
+  --color-surface: #F6FBFE;     /* screen fill */
+  --color-attn: #E9A23B;        /* Amber: attention, action */
+  --color-attn-tint: #FBE6C9;   /* alert cards, pills */
+  --color-attn-text: #8A5A1E;   /* text on amber */
+  --color-mint: #D3EEDD;        /* confirmed, in network */
+  --color-forest: #2D6A4A;      /* text on mint */
+  --color-coral: #E27D6F;       /* end call, supply ends */
+  --color-live: #4CB782;        /* connected dot */
+  --color-line: #D3E5F1;        /* pale blue-gray outlines */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-navy);
 }
