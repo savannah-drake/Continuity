@@ -12,6 +12,7 @@ export type ProviderSearch = {
   before?: string;            // only providers with an opening before this date (YYYY-MM-DD)
   language?: string;          // e.g. "Spanish"
   telehealth?: boolean;
+  syntheticOnly?: boolean;   // only Ivy's demo providers (used by the FaceTime agent)
   lat?: number;
   lng?: number;
   limit?: number;
@@ -25,6 +26,7 @@ export async function searchProviders(s: ProviderSearch) {
   if (s.type) filters.push(`provider_type:=${quote(s.type)}`);
   if (s.language) filters.push(`languages:=${quote(s.language)}`);
   if (s.telehealth) filters.push("telehealth:=true");
+  if (s.syntheticOnly) filters.push("is_synthetic:=true");
   if (s.before) {
     const cutoff = Math.floor(new Date(`${s.before}T23:59:59-05:00`).getTime() / 1000);
     filters.push(`next_open_slot:<${cutoff}`);

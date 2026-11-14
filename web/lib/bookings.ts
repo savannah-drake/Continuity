@@ -75,7 +75,7 @@ VALUES ($1, 'appointment', 'booked', ($2::timestamptz AT TIME ZONE 'America/New_
 }
 
 // Keep Typesense's soonest-opening info in sync after a booking
-async function refreshProviderInSearch(providerId: number) {
+export async function refreshProviderInSearch(providerId: number) {
   const rows = await query<{ npi: string; open_slot_count: string; next_open_slot: string | null }>(
 `SELECT p.npi, count(s.slot_id) FILTER (WHERE s.slot_status = 'open' AND s.slot_start > now()) AS open_slot_count, min(s.slot_start) FILTER (WHERE s.slot_status = 'open' AND s.slot_start > now()) AS next_open_slot
 FROM providers p

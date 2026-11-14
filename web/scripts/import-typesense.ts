@@ -8,13 +8,13 @@ import { typesenseAdmin as ts, NO_OPENINGS } from "../lib/typesense";
 
 type ProviderRow = {
   provider_id: number; npi: string; provider_name: string; provider_type: string; specialty: string;
-  address: string; lat: number; lng: number; insurance_plans: string[]; languages: string[] | null;
+  address: string; lat: number; lng: number; insurance_plans: string[]; languages: string[] | null; is_synthetic: boolean | null;
   open_slot_count: string; next_open_slot: Date | null; offers_telehealth: boolean | null;
 };
 
 async function main() {
   const rows = await query<ProviderRow>(
-`SELECT p.provider_id, p.npi, p.provider_name, p.provider_type, p.specialty, p.address, p.lat, p.lng, p.insurance_plans, p.languages, count(s.slot_id) FILTER (WHERE s.slot_status = 'open' AND s.slot_start > now()) AS open_slot_count, min(s.slot_start) FILTER (WHERE s.slot_status = 'open' AND s.slot_start > now()) AS next_open_slot, bool_or(s.telehealth) AS offers_telehealth
+`SELECT p.provider_id, p.npi, p.provider_name, p.provider_type, p.specialty, p.address, p.lat, p.lng, p.insurance_plans, p.languages, p.is_synthetic, count(s.slot_id) FILTER (WHERE s.slot_status = 'open' AND s.slot_start > now()) AS open_slot_count, min(s.slot_start) FILTER (WHERE s.slot_status = 'open' AND s.slot_start > now()) AS next_open_slot, bool_or(s.telehealth) AS offers_telehealth
 FROM providers p
 LEFT JOIN appointment_slots s ON s.provider_id = p.provider_id
 GROUP BY p.provider_id`,
@@ -32,6 +32,7 @@ GROUP BY p.provider_id`,
       { name: "insurance_plans", type: "string[]", facet: true },
       { name: "languages", type: "string[]", facet: true },
       { name: "telehealth", type: "bool", facet: true },
+      { name: "is_synthetic", type: "bool", facet: true },  // Ivy's demo providers (FaceTime agent offers only these)
       { name: "open_slot_count", type: "int32" },
       { name: "next_open_slot", type: "int64" },                 // unix seconds; NO_OPENINGS if none
       { name: "location", type: "geopoint" },                    // [lat, lng]
@@ -48,6 +49,7 @@ GROUP BY p.provider_id`,
     insurance_plans: r.insurance_plans ?? [],
     languages: r.languages ?? ["English"],
     telehealth: !!r.offers_telehealth,
+    is_synthetic: !!r.is_synthetic,
     open_slot_count: Number(r.open_slot_count),
     next_open_slot: r.next_open_slot ? Math.floor(new Date(r.next_open_slot).getTime() / 1000) : NO_OPENINGS,
     location: [Number(r.lat), Number(r.lng)],

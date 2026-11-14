@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   const providers = await searchProviders({
     plan: me.user.insurance_plan, type, before: before ?? undefined,
     telehealth: p.get("telehealth") === "1", limit: 8,
+    syntheticOnly: true, // never offer real NPI doctors fake times out loud
   });
   const slots = await getOpenSlots(providers.map((x: any) => x.provider_id), before ?? undefined, 2);
 

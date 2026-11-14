@@ -30,10 +30,13 @@ keeping medication refills on time, and finding in-network appointments that fit
 
 How to work:
 - At the start of every call, use get_care_status before giving any dates. Never guess dates or appointments.
-- To find appointments, use find_appointments. Offer at most two options at a time: provider, day and time,
-  and whether it's a video visit. Say these are example openings in a demo.
-- Before booking, read back the provider, day and time and ask "Should I book that?". Only call
-  book_appointment after a clear yes. Then confirm in one sentence.
+- To find appointments, use find_appointments. It returns numbered options. Offer option 1 first
+  (provider, day and time, video or in person); mention option 2 only if they want something else.
+  Say these are example openings in a demo.
+- Ask once: "Should I book that?" The moment the caller agrees (yes, sure, book it, that works, okay),
+  call book_appointment right away with that option_number. Do not ask again, do not wait.
+- After book_appointment returns, tell them it's booked in one sentence (provider, day, time).
+  If it says the time was taken, offer the next option.
 - Use plain words: "Monday, November sixteenth at nine AM", never IDs or codes.
 
 Style and safety:
@@ -46,28 +49,44 @@ Style and safety:
 
 const greeting = "Greet the caller by name if you know it, in one short sentence: say you are Continuity, an AI care assistant, and ask how you can help with their care today.";
 
-const tools = {
-  get_care_status: llm.tool({
-    description: "Get the caller's care plan: days of medication left, when they must book their next psychiatry visit, therapy timing, and upcoming appointments.",
-    parameters: z.object({}),
-    execute: async () => api(`/api/agent/status?userId=${USER_ID}`),
-  }),
-  find_appointments: llm.tool({
-    description: "Find in-network openings before the caller's deadline, soonest first. Returns up to 3 options, each with a slot_id.",
-    parameters: z.object({
-      provider_type: z.enum(['psychiatrist', 'therapist']).describe('psychiatrist for medication visits, therapist for therapy'),
-      video_only: z.boolean().optional().describe('true if the caller only wants video visits'),
+// Tools are built per call so each call remembers the options it offered ("option 1" -> slot_id).
+function makeTools() {
+  let lastOptions = [];
+  return {
+    get_care_status: llm.tool({
+      description: "Get the caller's care plan: days of medication left, when they must book their next psychiatry visit, therapy timing, and upcoming appointments.",
+      parameters: z.object({}),
+      execute: async () => api(`/api/agent/status?userId=${USER_ID}`),
     }),
-    execute: async ({ provider_type, video_only }) =>
-      api(`/api/agent/slots?userId=${USER_ID}&type=${provider_type}${video_only ? '&telehealth=1' : ''}`),
-  }),
-  book_appointment: llm.tool({
-    description: 'Book one opening. Only call this after the caller clearly said yes to that exact provider, day and time.',
-    parameters: z.object({ slot_id: z.number().describe('slot_id from find_appointments') }),
-    execute: async ({ slot_id }) =>
-      api('/api/agent/book', { method: 'POST', body: JSON.stringify({ userId: USER_ID, slotId: slot_id }) }),
-  }),
-};
+    find_appointments: llm.tool({
+      description: 'Find in-network openings before the caller\'s deadline, soonest first. Returns numbered options (1, 2, 3).',
+      parameters: z.object({
+        provider_type: z.enum(['psychiatrist', 'therapist']).describe('psychiatrist for medication visits, therapist for therapy'),
+        video_only: z.boolean().optional().describe('true if the caller only wants video visits'),
+      }),
+      execute: async ({ provider_type, video_only }) => {
+        const data = await api(`/api/agent/slots?userId=${USER_ID}&type=${provider_type}${video_only ? '&telehealth=1' : ''}`);
+        lastOptions = data.options || [];
+        return {
+          deadline: data.deadline,
+          note: data.note,
+          options: lastOptions.map((o, i) => ({
+            option_number: i + 1, provider: o.provider, specialty: o.specialty, when: o.when, video_visit: o.video_visit,
+          })),
+        };
+      },
+    }),
+    book_appointment: llm.tool({
+      description: 'Book one of the options from find_appointments. Call this immediately when the caller agrees.',
+      parameters: z.object({ option_number: z.number().describe('1, 2 or 3, from find_appointments') }),
+      execute: async ({ option_number }) => {
+        const option = lastOptions[Number(option_number) - 1];
+        if (!option) return { booked: false, reason: 'unknown_option', hint: 'Call find_appointments first.' };
+        return api('/api/agent/book', { method: 'POST', body: JSON.stringify({ userId: USER_ID, slotId: option.slot_id }) });
+      },
+    }),
+  };
+}
 
 const agent = defineAgent({
   entry: async ctx => {
@@ -78,7 +97,11 @@ const agent = defineAgent({
     const chertCallId = caller.identity.replace(/^chert-bridge-/, '');
 
     const session = new voice.AgentSession({
-      llm: new RealtimeModel({ apiKey: process.env.GOOGLE_API_KEY, model: 'gemini-2.5-flash-native-audio-preview-12-2025', voice: 'Aoede' }),
+      llm: new RealtimeModel({
+        apiKey: process.env.GOOGLE_API_KEY,
+        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-preview-12-2025',
+        voice: 'Aoede',
+      }),
     });
     ctx.addShutdownCallback(() => session.close());
     // Log every call to Tiger's call_log hypertable (never blocks the call)
@@ -93,7 +116,7 @@ const agent = defineAgent({
 
     await session.start({
       room: ctx.room,
-      agent: new voice.Agent({ instructions, tools }),
+      agent: new voice.Agent({ instructions, tools: makeTools() }),
       record: false,
       inputOptions: {
         participantIdentity: caller.identity,

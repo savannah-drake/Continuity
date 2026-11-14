@@ -36,6 +36,12 @@ WHERE b.user_id = $1
 AND b.event_type = 'confirmed'
 AND s.slot_status = 'booked'
 AND s.slot_start > now()
+AND NOT EXISTS (SELECT 1
+FROM booking_events b2
+WHERE b2.user_id = b.user_id
+AND b2.slot_id = b.slot_id
+AND b2.event_type = 'cancelled'
+AND b2.event_time > b.event_time)
 ORDER BY s.slot_start
 LIMIT 5`,
     [userId],
