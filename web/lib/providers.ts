@@ -1,6 +1,7 @@
 // lib/providers.ts
 // Provider search over Typesense. Used by /api/providers now and the FaceTime agent later.
 import { typesenseSearch } from "./typesense";
+import { query } from "./db";
 
 const EMORY = { lat: 33.7925, lng: -84.324 };
 
@@ -45,4 +46,34 @@ export async function searchProviders(s: ProviderSearch) {
     next_open_slot_iso: new Date(h.document.next_open_slot * 1000).toISOString(),
     distance_miles: Number(((h.geo_distance_meters?.location ?? 0) / 1609.34).toFixed(1)),
   }));
+}
+
+// Open slots for a set of providers, soonest first, up to `perProvider` each.
+// Tiger is the source of truth for slots; Typesense only knows each provider's soonest opening.
+
+export type OpenSlot = {
+  slot_id: number; provider_id: number; slot_start: string; duration_min: number;
+  telehealth: boolean; fits_maya_calendar: boolean | null; fits_sarah_calendar: boolean | null;
+};
+
+export async function getOpenSlots(providerIds: number[], before?: string, perProvider = 3) {
+  if (providerIds.length === 0) return new Map<number, OpenSlot[]>();
+  const cutoff = before ? `${before}T23:59:59-05:00` : "2100-01-01T00:00:00Z";
+  const rows = await query<OpenSlot>(
+`SELECT s.slot_id, s.provider_id, s.slot_start, s.duration_min, s.telehealth, s.fits_maya_calendar, s.fits_sarah_calendar
+FROM appointment_slots s
+WHERE s.provider_id = ANY($1)
+AND s.slot_status = 'open'
+AND s.slot_start > now()
+AND s.slot_start < $2
+ORDER BY s.slot_start`,
+    [providerIds, cutoff],
+  );
+  const byProvider = new Map<number, OpenSlot[]>();
+  for (const r of rows) {
+    const list = byProvider.get(r.provider_id) ?? [];
+    if (list.length < perProvider) list.push(r);
+    byProvider.set(r.provider_id, list);
+  }
+  return byProvider;
 }

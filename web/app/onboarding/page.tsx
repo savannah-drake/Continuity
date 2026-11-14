@@ -2,6 +2,7 @@
 // Functional onboarding form. Ivy's design replaces the styling later; words come from lib/copy.ts.
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { COPY, PLANS } from "@/lib/copy";
 import type { Timeline } from "@/lib/engine";
 
@@ -61,7 +62,7 @@ export default function Onboarding() {
     }
   }
 
-  if (result) return <PlanResult {...result} />;
+  if (result) return <PlanResult {...result} insurancePlan={insurancePlan} />;
 
   return (
     <main className="mx-auto max-w-lg p-6">
@@ -136,7 +137,9 @@ export default function Onboarding() {
 }
 
 // Temporary results view (PB-14 replaces this with the real timeline)
-function PlanResult({ timeline, therapyTimeline }: { timeline: Timeline | null; therapyTimeline: any }) {
+function PlanResult({ timeline, therapyTimeline, insurancePlan }: { timeline: Timeline | null; therapyTimeline: any; insurancePlan: string }) {
+  const find = (type: string, before: string) =>
+    `/providers?${new URLSearchParams({ plan: insurancePlan, type, before })}`;
   const T = COPY.timeline;
   const fmt = (d: string | null) =>
     d ? new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : "—";
@@ -158,6 +161,12 @@ function PlanResult({ timeline, therapyTimeline }: { timeline: Timeline | null; 
           {row(T.rxNeededBy, timeline.rxNeededBy)}
           {row(T.refillDeadline, timeline.refillDeadline)}
           {row(T.supplyEnd, timeline.supplyEndDate)}
+          {timeline.apptBy && (
+            <Link href={find("psychiatrist", timeline.apptBy)}
+              className="mt-4 block rounded-lg bg-black py-3 text-center text-white">
+              {COPY.results.findAppointment}
+            </Link>
+          )}
         </section>
       )}
       {therapyTimeline && (
@@ -165,6 +174,10 @@ function PlanResult({ timeline, therapyTimeline }: { timeline: Timeline | null; 
           <p className="font-medium">{COPY.actions[therapyTimeline.nextAction as keyof typeof COPY.actions]}</p>
           {row(T.bookSessionBy, therapyTimeline.bookBy)}
           {row(T.nextSessionBy, therapyTimeline.nextSessionBy)}
+          <Link href={find("therapist", therapyTimeline.nextSessionBy)}
+            className="mt-4 block rounded-lg border py-3 text-center">
+            {COPY.results.findTherapist}
+          </Link>
         </section>
       )}
     </main>

@@ -53,7 +53,21 @@ export const COPY = {
     nextSessionBy: "Next therapy session by",
     bookSessionBy: "Book it by",
   },
-
+  results: {
+    title: "Openings that work for you",
+    subtitle: (plan: string, before: string) =>
+      `In-network with ${plan || "your plan"}${before ? `, open before ${before}` : ""}. Soonest first.`,
+    demoNotice: "Demo availability: insurance acceptance and open times are simulated for this prototype.",
+    inNetwork: "In-network",
+    telehealth: "Video visits",
+    videoShort: "video",
+    milesAway: "mi away",
+    loading: "Finding openings…",
+    empty: "No in-network openings before your deadline yet. Try video visits or a later date, and we'll keep looking.",
+    error: "We couldn't load providers. Try again?",
+    findAppointment: "Find an appointment",
+    findTherapist: "Find a therapy session",
+  },
   // Engine action codes -> words
   actions: {
     book_today: "Your next appointment isn't booked yet. Let's find a time today.",
