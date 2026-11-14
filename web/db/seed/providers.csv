@@ -1,0 +1,57 @@
+﻿npi,slot_start,duration_min,telehealth,provider_name,specialty,street_address,city,state,zip,lat,lng,in_network_maya_student_plan,in_network_sarah_employer_ppo,fits_maya_calendar,fits_sarah_calendar,record_type
+9000000001,2026-11-16 09:00,45,Y,Dr. Elena Park,Psychiatrist (MD),2001 Clairmont Rd NE Ste 210,Atlanta,GA,30329,33.8135,-84.3111,Y,Y,N,N,SYNTHETIC_DEMO
+9000000001,2026-11-17 11:00,60,Y,Dr. Elena Park,Psychiatrist (MD),2001 Clairmont Rd NE Ste 210,Atlanta,GA,30329,33.8135,-84.3111,Y,Y,N,N,SYNTHETIC_DEMO
+9000000001,2026-11-17 14:30,30,Y,Dr. Elena Park,Psychiatrist (MD),2001 Clairmont Rd NE Ste 210,Atlanta,GA,30329,33.8135,-84.3111,Y,Y,N,N,SYNTHETIC_DEMO
+9000000001,2026-11-18 15:00,45,Y,Dr. Elena Park,Psychiatrist (MD),2001 Clairmont Rd NE Ste 210,Atlanta,GA,30329,33.8135,-84.3111,Y,Y,Y,N,SYNTHETIC_DEMO
+9000000001,2026-11-25 10:30,45,Y,Dr. Elena Park,Psychiatrist (MD),2001 Clairmont Rd NE Ste 210,Atlanta,GA,30329,33.8135,-84.3111,Y,Y,Y,Y,SYNTHETIC_DEMO
+9000000002,2026-11-18 09:00,45,Y,Dr. Marcus Bell,Psychiatrist (MD),315 W Ponce de Leon Ave Ste 400,Decatur,GA,30030,33.7746,-84.2995,Y,N,N,N,SYNTHETIC_DEMO
+9000000002,2026-11-19 10:00,30,Y,Dr. Marcus Bell,Psychiatrist (MD),315 W Ponce de Leon Ave Ste 400,Decatur,GA,30030,33.7746,-84.2995,Y,N,N,N,SYNTHETIC_DEMO
+9000000002,2026-11-19 15:30,45,Y,Dr. Marcus Bell,Psychiatrist (MD),315 W Ponce de Leon Ave Ste 400,Decatur,GA,30030,33.7746,-84.2995,Y,N,N,N,SYNTHETIC_DEMO
+9000000002,2026-11-25 12:00,30,Y,Dr. Marcus Bell,Psychiatrist (MD),315 W Ponce de Leon Ave Ste 400,Decatur,GA,30030,33.7746,-84.2995,Y,N,Y,N,SYNTHETIC_DEMO
+9000000003,2026-11-17 12:30,60,N,Dr. Priya Raman,Psychiatrist (MD),1100 Peachtree St NE Ste 600,Atlanta,GA,30309,33.787,-84.3834,N,Y,N,N,SYNTHETIC_DEMO
+9000000003,2026-11-17 15:00,30,N,Dr. Priya Raman,Psychiatrist (MD),1100 Peachtree St NE Ste 600,Atlanta,GA,30309,33.787,-84.3834,N,Y,N,N,SYNTHETIC_DEMO
+9000000003,2026-11-23 13:30,60,Y,Dr. Priya Raman,Psychiatrist (MD),1100 Peachtree St NE Ste 600,Atlanta,GA,30309,33.787,-84.3834,N,Y,N,N,SYNTHETIC_DEMO
+9000000003,2026-11-23 15:00,30,Y,Dr. Priya Raman,Psychiatrist (MD),1100 Peachtree St NE Ste 600,Atlanta,GA,30309,33.787,-84.3834,N,Y,Y,N,SYNTHETIC_DEMO
+9000000003,2026-11-24 12:30,60,Y,Dr. Priya Raman,Psychiatrist (MD),1100 Peachtree St NE Ste 600,Atlanta,GA,30309,33.787,-84.3834,N,Y,Y,N,SYNTHETIC_DEMO
+9000000003,2026-11-24 14:00,60,Y,Dr. Priya Raman,Psychiatrist (MD),1100 Peachtree St NE Ste 600,Atlanta,GA,30309,33.787,-84.3834,N,Y,N,N,SYNTHETIC_DEMO
+9000000004,2026-11-17 11:45,45,Y,"Janelle Okafor, LCSW",Therapist (LCSW),150 E Ponce de Leon Ave Ste 120,Decatur,GA,30030,33.7747,-84.2958,Y,Y,N,N,SYNTHETIC_DEMO
+9000000004,2026-11-18 12:00,45,Y,"Janelle Okafor, LCSW",Therapist (LCSW),150 E Ponce de Leon Ave Ste 120,Decatur,GA,30030,33.7747,-84.2958,Y,Y,Y,Y,SYNTHETIC_DEMO
+9000000004,2026-11-19 10:00,45,Y,"Janelle Okafor, LCSW",Therapist (LCSW),150 E Ponce de Leon Ave Ste 120,Decatur,GA,30030,33.7747,-84.2958,Y,Y,N,N,SYNTHETIC_DEMO
+9000000004,2026-11-23 10:00,50,N,"Janelle Okafor, LCSW",Therapist (LCSW),150 E Ponce de Leon Ave Ste 120,Decatur,GA,30030,33.7747,-84.2958,Y,Y,N,N,SYNTHETIC_DEMO
+9000000004,2026-11-24 14:45,50,Y,"Janelle Okafor, LCSW",Therapist (LCSW),150 E Ponce de Leon Ave Ste 120,Decatur,GA,30030,33.7747,-84.2958,Y,Y,N,N,SYNTHETIC_DEMO
+9000000004,2026-11-24 16:30,60,Y,"Janelle Okafor, LCSW",Therapist (LCSW),150 E Ponce de Leon Ave Ste 120,Decatur,GA,30030,33.7747,-84.2958,Y,Y,N,N,SYNTHETIC_DEMO
+9000000005,,,,Dr. Thomas Reyes,Psychiatrist (MD),3200 Downwood Cir NW Ste 300,Atlanta,GA,30327,33.8519,-84.429,Y,Y,,,SYNTHETIC_DEMO
+9000000006,2026-11-18 16:00,50,N,"Hannah Lindqvist, LPC",Therapist (LPC),1544 Piedmont Ave NE Ste 205,Atlanta,GA,30324,33.7966,-84.3689,Y,N,Y,N,SYNTHETIC_DEMO
+9000000006,2026-11-18 19:00,60,Y,"Hannah Lindqvist, LPC",Therapist (LPC),1544 Piedmont Ave NE Ste 205,Atlanta,GA,30324,33.7966,-84.3689,Y,N,N,N,SYNTHETIC_DEMO
+9000000006,2026-11-20 15:15,60,Y,"Hannah Lindqvist, LPC",Therapist (LPC),1544 Piedmont Ave NE Ste 205,Atlanta,GA,30324,33.7966,-84.3689,Y,N,N,N,SYNTHETIC_DEMO
+9000000006,2026-11-23 10:30,50,N,"Hannah Lindqvist, LPC",Therapist (LPC),1544 Piedmont Ave NE Ste 205,Atlanta,GA,30324,33.7966,-84.3689,Y,N,N,N,SYNTHETIC_DEMO
+9000000006,2026-11-25 15:45,50,Y,"Hannah Lindqvist, LPC",Therapist (LPC),1544 Piedmont Ave NE Ste 205,Atlanta,GA,30324,33.7966,-84.3689,Y,N,Y,N,SYNTHETIC_DEMO
+9000000007,2026-11-16 12:45,50,Y,Dr. Samuel Whitfield,Psychologist (PsyD),2470 Briarcliff Rd NE,Atlanta,GA,30329,33.8265,-84.3234,N,Y,N,N,SYNTHETIC_DEMO
+9000000007,2026-11-19 14:15,45,Y,Dr. Samuel Whitfield,Psychologist (PsyD),2470 Briarcliff Rd NE,Atlanta,GA,30329,33.8265,-84.3234,N,Y,N,N,SYNTHETIC_DEMO
+9000000007,2026-11-20 16:30,45,Y,Dr. Samuel Whitfield,Psychologist (PsyD),2470 Briarcliff Rd NE,Atlanta,GA,30329,33.8265,-84.3234,N,Y,N,N,SYNTHETIC_DEMO
+9000000007,2026-11-25 13:15,60,N,Dr. Samuel Whitfield,Psychologist (PsyD),2470 Briarcliff Rd NE,Atlanta,GA,30329,33.8265,-84.3234,N,Y,Y,N,SYNTHETIC_DEMO
+9000000008,2026-11-20 12:15,30,Y,Dr. Aisha Rahman,Psychiatrist (MD),1938 N Decatur Rd Ste B,Decatur,GA,30033,33.7981,-84.3177,Y,Y,Y,N,SYNTHETIC_DEMO
+9000000008,2026-11-20 20:15,30,Y,Dr. Aisha Rahman,Psychiatrist (MD),1938 N Decatur Rd Ste B,Decatur,GA,30033,33.7981,-84.3177,Y,Y,Y,Y,SYNTHETIC_DEMO
+9000000008,2026-11-23 13:00,30,Y,Dr. Aisha Rahman,Psychiatrist (MD),1938 N Decatur Rd Ste B,Decatur,GA,30033,33.7981,-84.3177,Y,Y,N,N,SYNTHETIC_DEMO
+9000000008,2026-11-25 17:00,45,N,Dr. Aisha Rahman,Psychiatrist (MD),1938 N Decatur Rd Ste B,Decatur,GA,30033,33.7981,-84.3177,Y,Y,Y,N,SYNTHETIC_DEMO
+9000000009,2026-11-17 14:15,50,N,"Carlos Mendez, LMFT",Therapist (LMFT),750 Glenwood Ave SE Ste 3,Atlanta,GA,30316,33.7403,-84.3531,N,N,N,N,SYNTHETIC_DEMO
+9000000009,2026-11-17 19:45,50,Y,"Carlos Mendez, LMFT",Therapist (LMFT),750 Glenwood Ave SE Ste 3,Atlanta,GA,30316,33.7403,-84.3531,N,N,Y,N,SYNTHETIC_DEMO
+9000000009,2026-11-18 10:00,45,Y,"Carlos Mendez, LMFT",Therapist (LMFT),750 Glenwood Ave SE Ste 3,Atlanta,GA,30316,33.7403,-84.3531,N,N,N,N,SYNTHETIC_DEMO
+9000000010,,,,Dr. Naomi Fields,Psychiatrist (MD),2800 Candler Rd Ste 12,Decatur,GA,30034,33.7129,-84.2542,N,Y,,,SYNTHETIC_DEMO
+9000000011,2026-11-16 12:15,50,Y,"Tiffany Brooks, LCSW",Therapist (LCSW),1050 Ponce de Leon Ave NE Ste 7,Atlanta,GA,30306,33.7722,-84.3548,Y,Y,N,N,SYNTHETIC_DEMO
+9000000011,2026-11-17 16:15,50,N,"Tiffany Brooks, LCSW",Therapist (LCSW),1050 Ponce de Leon Ave NE Ste 7,Atlanta,GA,30306,33.7722,-84.3548,Y,Y,N,N,SYNTHETIC_DEMO
+9000000011,2026-11-21 10:00,50,N,"Tiffany Brooks, LCSW",Therapist (LCSW),1050 Ponce de Leon Ave NE Ste 7,Atlanta,GA,30306,33.7722,-84.3548,Y,Y,Y,N,SYNTHETIC_DEMO
+9000000011,2026-11-24 10:00,60,Y,"Tiffany Brooks, LCSW",Therapist (LCSW),1050 Ponce de Leon Ave NE Ste 7,Atlanta,GA,30306,33.7722,-84.3548,Y,Y,N,N,SYNTHETIC_DEMO
+9000000011,2026-11-25 18:30,45,Y,"Tiffany Brooks, LCSW",Therapist (LCSW),1050 Ponce de Leon Ave NE Ste 7,Atlanta,GA,30306,33.7722,-84.3548,Y,Y,Y,N,SYNTHETIC_DEMO
+9000000012,2026-11-16 13:30,30,N,Dr. Kevin Nguyen,Psychiatrist (MD),5 Dunwoody Park Ste 100,Atlanta,GA,30338,33.9238,-84.3405,N,Y,N,N,SYNTHETIC_DEMO
+9000000012,2026-11-18 17:00,30,Y,Dr. Kevin Nguyen,Psychiatrist (MD),5 Dunwoody Park Ste 100,Atlanta,GA,30338,33.9238,-84.3405,N,Y,Y,N,SYNTHETIC_DEMO
+9000000012,2026-11-24 16:00,60,Y,Dr. Kevin Nguyen,Psychiatrist (MD),5 Dunwoody Park Ste 100,Atlanta,GA,30338,33.9238,-84.3405,N,Y,N,N,SYNTHETIC_DEMO
+9000000013,,,,"Rebecca Stone, LPC",Therapist (LPC),1250 Howell Mill Rd NW Ste 220,Atlanta,GA,30318,33.7936,-84.4119,Y,Y,,,SYNTHETIC_DEMO
+9000000014,2026-11-16 09:45,60,Y,Dr. Daniel Osei,Psychologist (PsyD),600 W Peachtree St NW Ste 900,Atlanta,GA,30308,33.7745,-84.3874,Y,N,N,N,SYNTHETIC_DEMO
+9000000014,2026-11-19 19:30,60,N,Dr. Daniel Osei,Psychologist (PsyD),600 W Peachtree St NW Ste 900,Atlanta,GA,30308,33.7745,-84.3874,Y,N,Y,N,SYNTHETIC_DEMO
+9000000014,2026-11-23 09:45,50,Y,Dr. Daniel Osei,Psychologist (PsyD),600 W Peachtree St NW Ste 900,Atlanta,GA,30308,33.7745,-84.3874,Y,N,N,N,SYNTHETIC_DEMO
+9000000014,2026-11-23 17:15,60,Y,Dr. Daniel Osei,Psychologist (PsyD),600 W Peachtree St NW Ste 900,Atlanta,GA,30308,33.7745,-84.3874,Y,N,Y,N,SYNTHETIC_DEMO
+9000000015,2026-11-17 14:45,45,N,"Monica Hale, LCSW",Therapist (LCSW),2100 E College Ave Ste 4,Decatur,GA,30030,33.774,-84.278,N,N,N,N,SYNTHETIC_DEMO
+9000000015,2026-11-18 19:45,60,N,"Monica Hale, LCSW",Therapist (LCSW),2100 E College Ave Ste 4,Decatur,GA,30030,33.774,-84.278,N,N,N,N,SYNTHETIC_DEMO
+9000000015,2026-11-19 18:30,45,N,"Monica Hale, LCSW",Therapist (LCSW),2100 E College Ave Ste 4,Decatur,GA,30030,33.774,-84.278,N,N,Y,N,SYNTHETIC_DEMO
+9000000015,2026-11-23 10:30,45,N,"Monica Hale, LCSW",Therapist (LCSW),2100 E College Ave Ste 4,Decatur,GA,30030,33.774,-84.278,N,N,N,N,SYNTHETIC_DEMO
