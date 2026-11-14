@@ -2,6 +2,7 @@
 // Loads Ivy's provider + availability sheet into Tiger (providers + appointment_slots).
 // Run from the web folder:
 //   npx tsx --env-file=.env.local scripts/seed-db.ts
+// Loads db/seed/providers.csv (Ivy) and db/seed/providers_npi.csv (real NPI providers) if present.
 // Safe to re-run: providers are upserted by NPI and their open slots are replaced.
 //
 // Sheet columns (one row per open slot; providers with no openings have an empty slot_start):
@@ -9,7 +10,7 @@
 //   state, zip, lat, lng, in_network_maya_student_plan, in_network_sarah_employer_ppo,
 //   fits_maya_calendar, fits_sarah_calendar, record_type
 //   optional: languages ("English;Spanish")
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parse } from "csv-parse/sync";
 import { pool } from "../lib/db";
 
@@ -25,9 +26,14 @@ const yes = (v?: string) => (v ?? "").trim().toUpperCase() === "Y";
 const providerType = (specialty: string) => specialty.split("(")[0].trim().toLowerCase();
 
 async function main() {
-  const rows: Row[] = parse(readFileSync("db/seed/providers.csv", "utf8"), {
+  // Default: Ivy's curated sheet, plus the real NPI providers if fetch-npi.ts has been run
+  const files = process.argv.slice(2).length
+    ? process.argv.slice(2)
+    : ["db/seed/providers.csv", "db/seed/providers_npi.csv"].filter((f) => existsSync(f));
+  const rows: Row[] = files.flatMap((f) => parse(readFileSync(f, "utf8"), {
     columns: true, skip_empty_lines: true, trim: true, bom: true,
-  });
+  }) as Row[]);
+  console.log(`Reading ${files.join(" + ")}`);
 
   // Group rows by provider
   const byNpi = new Map<string, Row[]>();
