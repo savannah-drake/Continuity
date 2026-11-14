@@ -9,3 +9,7 @@ CREATE TABLE IF NOT EXISTS booking_events (event_time TIMESTAMPTZ NOT NULL DEFAU
 CREATE TABLE IF NOT EXISTS call_log (call_time TIMESTAMPTZ NOT NULL DEFAULT now(), user_id INT, chert_call_id TEXT, duration_sec INT, call_outcome TEXT);
 SELECT create_hypertable('booking_events', 'event_time', if_not_exists => TRUE);
 SELECT create_hypertable('call_log', 'call_time', if_not_exists => TRUE);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS care_type TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_therapy_session DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS therapy_cadence_days INT;
+ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS booking_lead_days INT DEFAULT 14;
