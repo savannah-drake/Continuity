@@ -30,13 +30,19 @@ keeping medication refills on time, and finding in-network appointments that fit
 
 How to work:
 - At the start of every call, use get_care_status before giving any dates. Never guess dates or appointments.
-- To find appointments, use find_appointments. It returns numbered options. Offer option 1 first
-  (provider, day and time, video or in person); mention option 2 only if they want something else.
+- To find appointments, use find_appointments. Every option it returns is in-network for the caller's
+  insurance plan. Offer option 1 first (provider, day and time, video or in person, and that they take
+  the caller's plan by name); mention option 2 only if they want something else.
   Say these are example openings in a demo.
-- Ask once: "Should I book that?" The moment the caller agrees (yes, sure, book it, that works, okay),
-  call book_appointment right away with that option_number. Do not ask again, do not wait.
-- After book_appointment returns, tell them it's booked in one sentence (provider, day, time).
-  If it says the time was taken, offer the next option.
+- Before you call find_appointments or book_appointment, say one short line first, like "One sec, I'm checking."
+- You send appointment requests; the provider's office confirms. Ask once: "Want me to request that time?"
+  The moment the caller agrees (yes, sure, do it, that works, okay), call book_appointment right away
+  with that option_number. Do not ask again, do not wait.
+- After book_appointment returns, say in one or two sentences: the request for (provider, day, time) is sent
+  and that time is held for them; the office will confirm and check their coverage with their member ID.
+  Never say "you're booked" or "confirmed". If it says the time was taken, offer the next option.
+- Never ask for a member ID, insurance card, date of birth or other ID numbers. Continuity only uses
+  the plan name; the office handles the rest.
 - Use plain words: "Monday, November sixteenth at nine AM", never IDs or codes.
 - Language: reply in the language the caller speaks (English or Spanish). If they speak Spanish, keep
   speaking Spanish, and if they want a Spanish-speaking provider, pass language: "Spanish" to find_appointments.
@@ -49,6 +55,11 @@ Style and safety:
 - If someone sounds like they are in crisis, tell them they can call or text 988 any time, right now.
 - Don't say medication names out loud unless the caller says them first; say "your medication".`;
 
+// Session-close event name (enum in @livekit/agents 1.x, plain string as a fallback).
+const CLOSE_EVENT = voice.AgentSessionEventTypes?.Close ?? 'close';
+// Used only after an automatic reconnect.
+const RESUME_NOTE = "\n\nNote: the audio connection just dropped for a moment and you reconnected in the middle of this call. Any appointment options you listed earlier are still valid by their option number.";
+const RESUME_LINE = "Say one short sentence: 'Sorry, I lost you for a second. Could you say that again?' In Spanish if the caller was speaking Spanish.";
 const greeting = "Greet the caller by name if you know it, in one short sentence: say you are Continuity, an AI care assistant, and ask how you can help with their care today. Add: 'También hablo español.'";
 
 // Tools are built per call so each call remembers the options it offered ("option 1" -> slot_id).
@@ -80,7 +91,7 @@ function makeTools() {
       },
     }),
     book_appointment: llm.tool({
-      description: 'Book one of the options from find_appointments. Call this immediately when the caller agrees.',
+      description: 'Send an appointment request for one of the options from find_appointments (holds the time; the office confirms and checks coverage). Call this immediately when the caller agrees.',
       parameters: z.object({ option_number: z.number().describe('1, 2 or 3, from find_appointments') }),
       execute: async ({ option_number }) => {
         const option = lastOptions[Number(option_number) - 1];
@@ -99,38 +110,70 @@ const agent = defineAgent({
     const startedAt = Date.now();
     const chertCallId = caller.identity.replace(/^chert-bridge-/, '');
 
-    const session = new voice.AgentSession({
-      llm: new RealtimeModel({
-        apiKey: process.env.GOOGLE_API_KEY,
-        model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-preview-12-2025',
-        voice: 'Aoede',
-      }),
-    });
-    ctx.addShutdownCallback(() => session.close());
+    // Tools are made once per call, so "option 2" still means the same slot after a reconnect.
+    const tools = makeTools();
+    const MAX_RECONNECTS = 3;
+    let reconnects = 0;
+    let shuttingDown = false;
+    let session = null;
+
+    const callerStillHere = () => ctx.room.remoteParticipants?.has?.(caller.identity) ?? true;
+
+    // Gemini Live sometimes drops a session mid-call (error 1007, CONTENT_TYPE_AUDIO). Instead of
+    // going silent, open a fresh session in the same room and pick the conversation back up.
+    async function openSession({ resumed }) {
+      const s = new voice.AgentSession({
+        llm: new RealtimeModel({
+          apiKey: process.env.GOOGLE_API_KEY,
+          model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-preview-12-2025',
+          voice: 'Aoede',
+        }),
+      });
+
+      s.on(CLOSE_EVENT, async ev => {
+        if (s !== session || shuttingDown) return;
+        const reason = String(ev?.reason ?? '');
+        if (reason !== 'error' || !callerStillHere()) return;
+        if (reconnects >= MAX_RECONNECTS) { console.error('[continuity] Gemini dropped again; giving up after', reconnects, 'reconnects'); return; }
+        reconnects += 1;
+        console.warn(`[continuity] Gemini session dropped (${ev?.error?.error?.body?.code ?? 'unknown'}); reconnecting ${reconnects}/${MAX_RECONNECTS}`);
+        try {
+          session = await openSession({ resumed: true });
+        } catch (e) {
+          console.error('[continuity] reconnect failed', e);
+        }
+      });
+
+      await s.start({
+        room: ctx.room,
+        agent: new voice.Agent({ instructions: resumed ? instructions + RESUME_NOTE : instructions, tools }),
+        record: false,
+        inputOptions: {
+          participantIdentity: caller.identity,
+          audioEnabled: true,
+          videoEnabled: false,
+          textEnabled: false,
+          closeOnDisconnect: true,
+          deleteRoomOnClose: false,
+        },
+        outputOptions: { audioEnabled: true, transcriptionEnabled: false },
+      });
+      if (resumed) s.generateReply({ instructions: RESUME_LINE });
+      return s;
+    }
+
+    ctx.addShutdownCallback(async () => { shuttingDown = true; await session?.close(); });
     // Log every call to Tiger's call_log hypertable (never blocks the call)
     ctx.addShutdownCallback(async () => {
       try {
         await api('/api/agent/calls', {
           method: 'POST',
-          body: JSON.stringify({ chertCallId, userId: USER_ID, durationSec: Math.round((Date.now() - startedAt) / 1000), outcome: 'ended' }),
+          body: JSON.stringify({ chertCallId, userId: USER_ID, durationSec: Math.round((Date.now() - startedAt) / 1000), outcome: reconnects ? `ended_after_${reconnects}_reconnects` : 'ended' }),
         });
       } catch { /* logging is best-effort */ }
     });
 
-    await session.start({
-      room: ctx.room,
-      agent: new voice.Agent({ instructions, tools: makeTools() }),
-      record: false,
-      inputOptions: {
-        participantIdentity: caller.identity,
-        audioEnabled: true,
-        videoEnabled: false,
-        textEnabled: false,
-        closeOnDisconnect: true,
-        deleteRoomOnClose: false,
-      },
-      outputOptions: { audioEnabled: true, transcriptionEnabled: false },
-    });
+    session = await openSession({ resumed: false });
     // Greet once when Chert reports FaceTime is ready (the call ends if silent for 10 s after that).
     const stopGreeting = greetOnBridgeReady(ctx.room, () => session.generateReply({ instructions: greeting }));
     ctx.addShutdownCallback(async () => stopGreeting());
