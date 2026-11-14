@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS users (user_id SERIAL PRIMARY KEY, phone TEXT UNIQUE NOT NULL, display_name TEXT, insurance_plan TEXT, home_lat DOUBLE PRECISION, home_lng DOUBLE PRECISION, time_zone TEXT DEFAULT 'America/New_York');
+CREATE TABLE IF NOT EXISTS providers (provider_id SERIAL PRIMARY KEY, npi TEXT UNIQUE, provider_name TEXT, provider_type TEXT, address TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, insurance_plans TEXT[], telehealth BOOLEAN, booking_lead_days INT);
+CREATE TABLE IF NOT EXISTS medications (medication_id SERIAL PRIMARY KEY, user_id INT REFERENCES users, display_label TEXT, days_supply_remaining INT, supply_as_of DATE, buffer_days INT DEFAULT 3);
+CREATE TABLE IF NOT EXISTS prescriptions (prescription_id SERIAL PRIMARY KEY, medication_id INT REFERENCES medications, provider_id INT REFERENCES providers, refills_remaining INT, rx_expires_on DATE, requires_appointment_for_renewal BOOLEAN, renewal_turnaround_days INT DEFAULT 2, pharmacy_processing_days INT DEFAULT 1);
+CREATE TABLE IF NOT EXISTS appointment_slots (slot_id SERIAL PRIMARY KEY, provider_id INT REFERENCES providers, slot_start TIMESTAMPTZ, duration_min INT, telehealth BOOLEAN, slot_status TEXT DEFAULT 'open');
+CREATE TABLE IF NOT EXISTS calendar_blocks (block_id SERIAL PRIMARY KEY, user_id INT REFERENCES users, starts_at TIMESTAMPTZ, ends_at TIMESTAMPTZ, label TEXT);
+CREATE TABLE IF NOT EXISTS care_steps (step_id SERIAL PRIMARY KEY, user_id INT REFERENCES users, prescription_id INT REFERENCES prescriptions, step_type TEXT, step_status TEXT DEFAULT 'pending', due_by DATE, completed_at TIMESTAMPTZ);
+CREATE TABLE IF NOT EXISTS booking_events (event_time TIMESTAMPTZ NOT NULL DEFAULT now(), user_id INT, slot_id INT, event_type TEXT, event_source TEXT);
+CREATE TABLE IF NOT EXISTS call_log (call_time TIMESTAMPTZ NOT NULL DEFAULT now(), user_id INT, chert_call_id TEXT, duration_sec INT, call_outcome TEXT);
+SELECT create_hypertable('booking_events', 'event_time', if_not_exists => TRUE);
+SELECT create_hypertable('call_log', 'call_time', if_not_exists => TRUE);
