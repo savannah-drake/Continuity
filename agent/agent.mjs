@@ -30,7 +30,9 @@ keeping medication refills on time, and finding in-network appointments that fit
 
 How to work:
 - At the start of every call, use get_care_status before giving any dates. Never guess dates or appointments.
-- To find appointments, use find_appointments. Every option it returns is in-network for the caller's
+- To find appointments, use find_appointments. If the caller describes who they want in their own words
+  ("a counselor", "someone for my ADHD meds", "una terapeuta", a provider's name), pass those 1-3 key words
+  as in_their_words. Every option it returns is in-network for the caller's
   insurance plan. Offer option 1 first (provider, day and time, video or in person, and that they take
   the caller's plan by name); mention option 2 only if they want something else.
   Say these are example openings in a demo.
@@ -77,13 +79,19 @@ function makeTools() {
         provider_type: z.enum(['psychiatrist', 'therapist']).describe('psychiatrist for medication visits, therapist for therapy'),
         video_only: z.boolean().optional().describe('true if the caller only wants video visits'),
         language: z.string().optional().describe('e.g. "Spanish" if they want a provider who speaks it'),
+        in_their_words: z.string().optional().describe('1 to 3 key words the caller used for who they want, in their own language, e.g. "counselor", "shrink", "ADHD", "terapeuta", "Dr. Park". Leave out if they only said therapist or psychiatrist.'),
       }),
-      execute: async ({ provider_type, video_only, language }) => {
-        const data = await api(`/api/agent/slots?userId=${USER_ID}&type=${provider_type}${video_only ? '&telehealth=1' : ''}${language ? `&language=${encodeURIComponent(language)}` : ''}`);
+      execute: async ({ provider_type, video_only, language, in_their_words }) => {
+        const qs = new URLSearchParams({ userId: String(USER_ID), type: provider_type });
+        if (video_only) qs.set('telehealth', '1');
+        if (language) qs.set('language', language);
+        if (in_their_words) qs.set('q', in_their_words);
+        const data = await api(`/api/agent/slots?${qs}`);
         lastOptions = data.options || [];
         return {
           deadline: data.deadline,
           note: data.note,
+          ...(data.searched_for ? { searched_for: data.searched_for, matched_their_words: data.matched_their_words } : {}),
           options: lastOptions.map((o, i) => ({
             option_number: i + 1, provider: o.provider, specialty: o.specialty, when: o.when, video_visit: o.video_visit,
           })),

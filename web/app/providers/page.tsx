@@ -47,6 +47,10 @@ function Results() {
   const [sort, setSort] = useState<"soonest" | "nearest">("soonest");
   const [radius, setRadius] = useState(0);
   const [spanish, setSpanish] = useState(false);
+  // Search box (Typesense: typo tolerance + synonyms like "shrink", "terapeuta"). Debounced.
+  const [input, setInput] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => { const t = setTimeout(() => setQ(input.trim()), 300); return () => clearTimeout(t); }, [input]);
   useEffect(() => { if (lang === "es") setSpanish(true); }, [lang]);
 
   const lat = me?.user.home_lat ?? null;
@@ -58,7 +62,9 @@ function Results() {
   useEffect(() => {
     setProviders(null); setError(false);
     const qs = new URLSearchParams({
-      type, slots: "1", sort,
+      slots: "1", sort,
+      // A typed search looks across therapists AND psychiatrists ("terapeuta" from the psychiatrist tab still works)
+      ...(q ? { q } : { type }),
       ...(plan ? { plan } : {}), ...(before ? { before } : {}),
       ...(radius ? { radius: String(radius) } : {}),
       ...(spanish ? { language: "Spanish" } : {}),
@@ -68,7 +74,7 @@ function Results() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setProviders)
       .catch(() => setError(true));
-  }, [plan, type, before, sort, radius, spanish, lat, lng]);
+  }, [plan, type, before, sort, radius, spanish, lat, lng, q]);
 
   const switchTab = (t: string) =>
     router.replace(`/providers?${new URLSearchParams({ type: t, ...(plan ? { plan } : {}), ...(before ? { before } : {}) })}`);
@@ -77,6 +83,9 @@ function Results() {
     <Screen nav>
       <h1 className="text-[26px] font-bold text-navy">{type === "therapist" ? R.therapistsTitle : R.psychiatristsTitle}</h1>
       <p className="mb-4 text-sm text-muted">{type === "therapist" ? R.therapistsSub : R.psychiatristsSub}</p>
+      <input type="search" value={input} onChange={(e) => setInput(e.target.value)} placeholder={R.searchPlaceholder}
+        aria-label={R.searchPlaceholder}
+        className="mb-4 h-11 w-full rounded-full border border-line bg-white px-4 text-sm text-navy placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand" />
 
       <p className="mb-3 rounded-full bg-mist px-4 py-2 text-center text-xs font-bold text-navy">
         {R.chip(plan, before ? fmtShort(before) : "")}

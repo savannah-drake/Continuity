@@ -44,12 +44,28 @@ export default function Onboarding() {
   }
 
   function useMyLocation() {
-    setLocNote(null);
-    if (!navigator.geolocation) return setLocNote(C.locationDenied);
+    setCoords(null);
+    if (!navigator.geolocation || !window.isSecureContext) return setLocNote(C.locationDenied);
+    setLocNote(C.locating);
     navigator.geolocation.getCurrentPosition(
-      (pos) => { setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocNote(C.locationFound); },
-      () => setLocNote(C.locationDenied),
-      { enableHighAccuracy: false, timeout: 8000 },
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setCoords({ lat, lng });
+        setLocNote(C.locationFound);
+        // Fill the ZIP box so people can see where we'll search from (free reverse lookup, no key).
+        try {
+          const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+          const g = await r.json();
+          const found = String(g?.postcode ?? "").slice(0, 5);
+          if (/^\d{5}$/.test(found)) setZip(found);
+        } catch { /* coordinates are saved either way */ }
+      },
+      (err) => {
+        console.warn("[onboarding] location error", err.code, err.message);
+        // 1 = the browser or Mac blocked it; 2/3 = no fix or too slow (common on laptops)
+        setLocNote(err.code === 1 ? C.locationBlocked : C.locationDenied);
+      },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 },
     );
   }
 

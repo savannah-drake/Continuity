@@ -53,6 +53,8 @@ export const COPY = {
     locationHelp: "We use this only to find providers near you.",
     zipLabel: "Your ZIP code",
     useMyLocation: "Use my location",
+    locating: "Finding your location…",
+    locationBlocked: "Location is turned off for this browser. Type your ZIP code instead, or allow location and try again.",
     locationFound: "Got it, we'll search near you.",
     locationDenied: "We couldn't get your location. You can type your ZIP code instead.",
 
@@ -153,6 +155,7 @@ export const COPY = {
   },
 
   results: {
+    searchPlaceholder: "Search: name, \"therapist\", \"shrink\", \"terapeuta\"…",
     therapistsTitle: "Therapists near you",
     therapistsSub: "These match your insurance.",
     psychiatristsTitle: "Psychiatrists near you",
@@ -242,6 +245,8 @@ export const COPY_ES: typeof COPY = {
     locationHelp: "Solo la usamos para encontrar profesionales cerca de ti.",
     zipLabel: "Tu código postal",
     useMyLocation: "Usar mi ubicación",
+    locating: "Buscando tu ubicación…",
+    locationBlocked: "La ubicación está desactivada en este navegador. Escribe tu código postal, o permite la ubicación e inténtalo de nuevo.",
     locationFound: "Listo, buscaremos cerca de ti.",
     locationDenied: "No pudimos obtener tu ubicación. Puedes escribir tu código postal.",
 
@@ -341,6 +346,7 @@ export const COPY_ES: typeof COPY = {
   },
 
   results: {
+    searchPlaceholder: "Buscar: nombre, \"terapeuta\", \"psiquiatra\"…",
     therapistsTitle: "Terapeutas cerca de ti",
     therapistsSub: "Coinciden con tu seguro.",
     psychiatristsTitle: "Psiquiatras cerca de ti",
