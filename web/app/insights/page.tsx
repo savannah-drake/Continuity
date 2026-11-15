@@ -2,6 +2,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Screen, Card, Eyebrow, BottomNav, Notice } from "@/components/ui";
+import { FundCard } from "@/components/CareFund";
 
 type Day = { day: string; web: number; facetime: number; calls: number };
 type Data = { series: Day[]; totals: { booked: number; viaFacetimePct: number; calls: number; avgCallSec: number }; source: string };
@@ -71,6 +72,7 @@ export default function Insights() {
           <Notice>Powered by {data.source}. Includes demo history.</Notice>
         </>
       )}
+      <FundCard />
       <BottomNav active="home" />
     </Screen>
   );

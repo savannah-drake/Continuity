@@ -2,18 +2,20 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { COPY } from "@/lib/copy";
+import { useCopy } from "@/lib/i18n";
 import { useMe, getUserId, fmtShort, isoDay } from "@/lib/useMe";
 import { diffDays } from "@/lib/engine";
 import { Screen, Card, Avatar, Button, ButtonLink, Notice, Eyebrow } from "@/components/ui";
+import { CopayHelp } from "@/components/CareFund";
 
 type Slot = {
   slot_id: number; slot_start: string; duration_min: number; telehealth: boolean; slot_status: string;
   provider_name: string; specialty: string; address: string;
 };
-const B = COPY.booking;
 
 export default function BookPage() {
+  const COPY = useCopy();
+  const B = COPY.booking;
   const { slotId } = useParams<{ slotId: string }>();
   const router = useRouter();
   const { me } = useMe();
@@ -82,12 +84,18 @@ export default function BookPage() {
       )}
 
       {state === "done" && <p className="mb-4 text-xs text-muted">{B.reminders}</p>}
+      {state === "done" && <CopayHelp slotId={Number(slotId)} userId={getUserId()} />}
       <div className="mb-4"><Notice>{COPY.results.demoNotice}</Notice></div>
 
       {(state === "ready" || state === "saving") && (
         <Button onClick={confirm} disabled={state === "saving"}>{state === "saving" ? B.saving : B.confirm}</Button>
       )}
       {state === "taken" && <Button kind="secondary" onClick={() => router.back()}>{B.pickAnother}</Button>}
+      {state === "done" && (
+        <a href={`/api/bookings/ics?slotId=${slotId}`} className="mb-3 block text-center text-sm font-bold text-brand underline">
+          {COPY.booking.addToCalendar}
+        </a>
+      )}
       {state === "done" && <ButtonLink href="/">{B.done}</ButtonLink>}
     </Screen>
   );

@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       specialty: prov.specialty,
       when: spokenWhen(s.slot_start),
       video_visit: s.telehealth,
+      length_minutes: s.duration_min,
       miles_away: prov.distance_miles,
       in_network: true,
     }));

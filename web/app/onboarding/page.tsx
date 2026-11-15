@@ -29,6 +29,8 @@ export default function Onboarding() {
   const [lastSession, setLastSession] = useState("");
   const [cadence, setCadence] = useState(14);
   const [zip, setZip] = useState("");
+  // Ivy's insurance fields are shown for the design but kept in this screen only: never sent or saved.
+  const [localOnly, setLocalOnly] = useState({ dob: "", memberId: "", group: "", holder: "", front: false, back: false });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locNote, setLocNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -122,6 +124,10 @@ export default function Onboarding() {
             <Field label={C.phoneLabel} help={C.phoneHelp}>
               <input className={inputClass} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 404 555 0100" />
             </Field>
+            <Field label={C.dobLabel} help={C.dobHelp}>
+              <input className={inputClass} inputMode="numeric" autoComplete="off" value={localOnly.dob}
+                onChange={(e) => setLocalOnly({ ...localOnly, dob: e.target.value })} placeholder="MM / DD / YYYY" />
+            </Field>
           </div>
         </>
       )}
@@ -129,12 +135,39 @@ export default function Onboarding() {
       {step === 2 && (
         <>
           <Title sub={C.insuranceHelp}>{C.insuranceTitle}</Title>
-          <Field label={C.planLabel} help={C.planHelp}>
-            <select className={inputClass} value={insurancePlan} onChange={(e) => setInsurancePlan(e.target.value)}>
-              {PLANS.map((p) => <option key={p}>{p}</option>)}
-            </select>
-          </Field>
-          <div className="mt-4"><Notice>{C.privacyShort}</Notice></div>
+          <div className="space-y-4">
+            <Field label={C.planLabel} help={C.planHelp || undefined}>
+              <select className={inputClass} value={insurancePlan} onChange={(e) => setInsurancePlan(e.target.value)}>
+                {PLANS.map((p) => <option key={p}>{p}</option>)}
+              </select>
+            </Field>
+            <Field label={C.memberIdLabel} help={C.memberIdHelp}>
+              <input className={inputClass} autoComplete="off" value={localOnly.memberId} onChange={(e) => setLocalOnly({ ...localOnly, memberId: e.target.value })} />
+            </Field>
+            <Field label={C.groupLabel} help={C.groupHelp}>
+              <input className={inputClass} autoComplete="off" value={localOnly.group} onChange={(e) => setLocalOnly({ ...localOnly, group: e.target.value })} />
+            </Field>
+            <Field label={C.holderLabel} help={C.holderHelp}>
+              <input className={inputClass} autoComplete="off" value={localOnly.holder} onChange={(e) => setLocalOnly({ ...localOnly, holder: e.target.value })} />
+            </Field>
+            <Field label={C.cardLabel} help={C.cardHelp}>
+              <div className="flex gap-3">
+                {(["front", "back"] as const).map((side) => (
+                  // Opens the camera / photo picker; the photo is never read or uploaded.
+                  <label key={side}
+                    className={`flex-1 cursor-pointer rounded-xl border border-dashed py-3 text-center text-sm font-bold ${localOnly[side] ? "border-forest bg-mint text-forest" : "border-line bg-white text-navy"}`}>
+                    {localOnly[side] ? `✓ ${C.cardAdded}` : side === "front" ? C.cardFront : C.cardBack}
+                    <input type="file" accept="image/*" capture="environment" className="hidden"
+                      onChange={(e) => { setLocalOnly({ ...localOnly, [side]: Boolean(e.target.files?.length) }); e.target.value = ""; }} />
+                  </label>
+                ))}
+              </div>
+            </Field>
+          </div>
+          <div className="mt-4 space-y-2">
+            <Notice>{C.notSaved}</Notice>
+            <Notice>{C.privacyShort}</Notice>
+          </div>
         </>
       )}
 
