@@ -105,10 +105,27 @@ export function BottomNav({ active }: { active: "home" | "providers" | "timeline
   );
   return (
     <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md items-center justify-around border-t border-line bg-white px-6 py-3">
-      {item("profile", "/onboarding", N.profile, "◯")}
+      {item("profile", "/profile", N.profile, "◯")}
       {item("providers", "/providers", N.providers, "⌖")}
       {item("home", "/", N.home, "⌂")}
       {item("timeline", "/timeline", N.timeline, "☰")}
     </nav>
+  );
+}
+
+// Switch between the Timeline (deadlines) and Calendar (your week) views
+export function TimelineTabs({ active }: { active: "timeline" | "calendar" }) {
+  const C = useCopy();
+  const tab = (key: "timeline" | "calendar", href: string, label: string) => (
+    <Link href={href} aria-current={active === key ? "page" : undefined}
+      className={`flex-1 rounded-full py-2 text-center text-sm font-bold ${active === key ? "bg-white text-navy shadow-sm" : "text-muted"}`}>
+      {label}
+    </Link>
+  );
+  return (
+    <div className="mb-4 flex rounded-full bg-mist p-1">
+      {tab("timeline", "/timeline", C.nav.timeline)}
+      {tab("calendar", "/schedule", C.nav.calendar)}
+    </div>
   );
 }

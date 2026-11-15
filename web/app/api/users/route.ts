@@ -103,3 +103,29 @@ VALUES ($1, $2, $3, $4, $5)`,
     client.release();
   }
 }
+
+// PATCH /api/users: Profile edits. Only these fields; anything else in the body is ignored.
+// { userId, displayName?, insurancePlan?, preferredLanguage?, homeZip? }  (ZIP -> lat/lng like onboarding)
+export async function PATCH(req: Request) {
+  const b = await req.json().catch(() => ({}));
+  const userId = Number(b.userId);
+  if (!Number.isInteger(userId) || userId <= 0) return Response.json({ error: "userId required" }, { status: 400 });
+  const sets: string[] = [];
+  const vals: unknown[] = [userId];
+  const add = (col: string, v: unknown) => { vals.push(v); sets.push(`${col} = $${vals.length}`); };
+  if (typeof b.displayName === "string" && b.displayName.trim()) add("display_name", b.displayName.trim().slice(0, 60));
+  if (typeof b.insurancePlan === "string" && b.insurancePlan.trim()) add("insurance_plan", b.insurancePlan.trim().slice(0, 80));
+  if (b.preferredLanguage === "en" || b.preferredLanguage === "es") add("preferred_language", b.preferredLanguage);
+  if (typeof b.homeZip === "string" && /^\d{5}$/.test(b.homeZip)) {
+    const c = await zipToCoords(b.homeZip);
+    if (!c) return Response.json({ error: "zip_not_found" }, { status: 400 });
+    add("home_zip", b.homeZip); add("home_lat", c.lat); add("home_lng", c.lng);
+  }
+  if (!sets.length) return Response.json({ error: "nothing_to_update" }, { status: 400 });
+  const r = await pool.query(
+`UPDATE users SET ${sets.join(", ")}
+WHERE user_id = $1
+RETURNING user_id`, vals);
+  if (!r.rowCount) return Response.json({ error: "not_found" }, { status: 404 });
+  return Response.json({ ok: true });
+}

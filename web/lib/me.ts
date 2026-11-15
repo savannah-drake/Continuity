@@ -17,12 +17,13 @@ WHERE u.user_id = $1`,
   const user = users[0];
   if (!user) return null;
 
+  // A student can have several medications; until the app shows them all, use the one that runs out first
   const meds = await query(
 `SELECT m.display_label, m.days_supply_remaining, to_char(m.supply_as_of, 'YYYY-MM-DD') AS supply_as_of, p.refills_remaining, to_char(p.rx_expires_on, 'YYYY-MM-DD') AS rx_expires_on, p.requires_appointment_for_renewal, p.booking_lead_days
 FROM medications m
 JOIN prescriptions p ON p.medication_id = m.medication_id
 WHERE m.user_id = $1
-ORDER BY m.medication_id DESC
+ORDER BY m.supply_as_of + m.days_supply_remaining, m.medication_id DESC
 LIMIT 1`,
     [userId],
   );

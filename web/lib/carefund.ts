@@ -39,7 +39,7 @@ export async function fundSummary() {
     `SELECT count(*)::text AS grants, sum(amount_usd)::text AS usd FROM care_fund_payouts`,
   );
   const recent = await query<{ paid_at: string; amount_usd: string; tx_signature: string }>(
-    `SELECT paid_at, amount_usd::text, tx_signature FROM care_fund_payouts ORDER BY paid_at DESC LIMIT 5`,
+    `SELECT paid_at, amount_usd::text, tx_signature FROM care_fund_payouts ORDER BY paid_at DESC LIMIT 10`,
   );
   return {
     address: fund.publicKey.toBase58(),
@@ -49,6 +49,7 @@ export async function fundSummary() {
     grants: Number(totals?.grants ?? 0),
     grantedUsd: Number(totals?.usd ?? 0),
     grantUsd: GRANT_USD,
+    lamportsPerUsd: LAMPORTS_PER_USD,
     recent: recent.map((r) => ({ ...r, explorer: explorerTx(r.tx_signature) })),
   };
 }

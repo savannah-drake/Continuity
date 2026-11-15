@@ -47,3 +47,14 @@ WHERE b.user_id = $1
 AND b.ends_at > now()`, [userId]);
   return { connected: Number(row?.block_count ?? 0) > 0, upcomingBusy: Number(row?.block_count ?? 0) };
 }
+
+// Busy times for the week view (start/end only; there is nothing else stored)
+export async function busyBetween(userId: number, from: Date, to: Date) {
+  return query<{ starts_at: string; ends_at: string }>(
+`SELECT b.starts_at, b.ends_at
+FROM busy_blocks b
+WHERE b.user_id = $1
+AND b.ends_at > $2
+AND b.starts_at < $3
+ORDER BY b.starts_at`, [userId, from.toISOString(), to.toISOString()]);
+}

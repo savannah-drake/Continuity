@@ -11,8 +11,8 @@ const CF = {
     ask: (usd: number) => `Cost shouldn't be the reason you skip a visit. The fund can cover $${usd} of your copay.`,
     button: "Help with my copay",
     paying: "Sending…",
-    paid: (usd: number) => `$${usd} sent to your provider's office.`,
-    proof: "See the public receipt",
+    paid: (usd: number) => `Covered by the Continuity Care Fund: $${usd} sent to your provider's office.`,
+    proof: "View on Solana Explorer",
     empty: "The fund is empty right now. We'll let you know when it's refilled.",
     error: "That didn't go through. Your appointment is still booked.",
     fundTitle: "Care Fund",
@@ -20,14 +20,15 @@ const CF = {
     available: (usd: number) => `$${usd} available`,
     wallet: "View the fund on Solana Explorer",
     demo: "Demo on Solana devnet. No real money moves.",
+    donate: "Donate",
   },
   es: {
     eyebrow: "Fondo de Cuidado Continuity",
     ask: (usd: number) => `El costo no debería impedirte ir a tu cita. El fondo puede cubrir $${usd} de tu copago.`,
     button: "Ayuda con mi copago",
     paying: "Enviando…",
-    paid: (usd: number) => `Se enviaron $${usd} al consultorio.`,
-    proof: "Ver el recibo público",
+    paid: (usd: number) => `Cubierto por el Fondo de Atención Continuity: se enviaron $${usd} al consultorio.`,
+    proof: "Ver en Solana Explorer",
     empty: "El fondo está vacío por ahora. Te avisaremos cuando se recargue.",
     error: "No se pudo completar. Tu cita sigue agendada.",
     fundTitle: "Fondo de Cuidado",
@@ -35,6 +36,7 @@ const CF = {
     available: (usd: number) => `$${usd} disponibles`,
     wallet: "Ver el fondo en Solana Explorer",
     demo: "Demostración en Solana devnet. No se mueve dinero real.",
+    donate: "Donar",
   },
 };
 
@@ -87,7 +89,10 @@ export function FundCard() {
       <Eyebrow>{t.fundTitle}</Eyebrow>
       <p className="text-2xl font-extrabold">{t.available(fund.balanceUsd)}</p>
       <p className="mb-2 text-sm text-muted">{t.fundBody(fund.grants, fund.grantedUsd)}</p>
-      <a className="text-sm font-semibold text-brand underline" href={fund.explorer} target="_blank" rel="noreferrer">{t.wallet}</a>
+      <div className="flex justify-between">
+        <a className="text-sm font-semibold text-brand underline" href={fund.explorer} target="_blank" rel="noreferrer">{t.wallet}</a>
+        <a className="text-sm font-bold text-brand underline" href="/fund">{t.donate}</a>
+      </div>
       <p className="mt-3 text-[11px] text-muted">{t.demo}</p>
     </Card>
   );

@@ -2,7 +2,7 @@
 "use client";
 import { useCopy } from "@/lib/i18n";
 import { useMe, fmtDay, isoDay, fmtTime, providersHref } from "@/lib/useMe";
-import { Screen, Card, Eyebrow, Pill, ButtonLink, BottomNav } from "@/components/ui";
+import { Screen, Card, Eyebrow, Pill, ButtonLink, BottomNav, TimelineTabs } from "@/components/ui";
 
 type Dot = "today" | "confirmed" | "action" | "end" | "later";
 const dotColor: Record<Dot, string> = {
@@ -43,6 +43,7 @@ export default function TimelinePage() {
 
   return (
     <Screen nav>
+      <TimelineTabs active="timeline" />
       <Eyebrow>{T.eyebrow}</Eyebrow>
       <h1 className="mt-1 text-[26px] font-bold text-navy">{T.title}</h1>
       <p className="mb-5 text-sm text-muted">{T.sub}</p>

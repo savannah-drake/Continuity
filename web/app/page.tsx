@@ -29,10 +29,24 @@ export default function Home() {
 
   return (
     <Screen nav>
+      {/* FaceTime button with the mascot inside: calls the Chert FaceTime line */}
       <a href={FACETIME_NUMBER ? `facetime:${FACETIME_NUMBER}` : "#"}
-        className="mb-6 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand text-[15px] font-bold text-white hover:brightness-95">
-        <span aria-hidden>▶</span> {H.facetime}
+        className="mb-6 flex w-full items-center gap-4 rounded-3xl bg-brand p-3 pr-5 text-left text-white shadow-sm hover:brightness-95">
+        <span className="mascot-float relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-white">
+          <img src="/mascot.png" alt="" className="absolute inset-0 h-full w-full object-contain" />
+          <img src="/mascot-blink.png" alt="" aria-hidden className="mascot-blink absolute inset-0 h-full w-full object-contain" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[17px] font-bold">▶ {H.facetime}</span>
+          <span className="block text-xs text-white/85">{H.facetimeHelp}</span>
+          <span className="block text-xs text-white/70">{H.facetimeNote}</span>
+        </span>
       </a>
+      <div className="-mt-4 mb-6 flex justify-center">
+        <a href={FACETIME_NUMBER ? `facetime-audio:${FACETIME_NUMBER}` : "#"} className="text-xs font-bold text-brand underline-offset-2 hover:underline">
+          📞 {H.facetimeAudio}
+        </a>
+      </div>
 
       <div className="flex items-start justify-between gap-3">
         <h1 className="text-[26px] font-bold text-navy">{H.greeting(name)}</h1>
@@ -149,6 +163,7 @@ export default function Home() {
           )}
         </div>
 
+        <Link href="/fund" className="mb-3 block text-center text-sm font-bold text-brand underline">{COPY.fund.link}</Link>
         <Notice>{COPY.aiDisclosure}</Notice>
       </div>
       <BottomNav active="home" />

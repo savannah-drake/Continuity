@@ -1,6 +1,8 @@
 // app/onboarding/page.tsx: 4 steps (About you → Insurance → Your care → Your location), Ivy's Onboarding mockup.
 // Language (English/Español) can be switched on step 1; location saves home_lat/home_lng for Typesense geo search.
 "use client";
+import { formatPhone, formatDob, phoneE164 } from "@/lib/format";
+import { SuggestInput } from "@/components/Suggest";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PLANS } from "@/lib/copy";
@@ -81,7 +83,7 @@ export default function Onboarding() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          displayName, phone, insurancePlan, careType,
+          displayName, phone: phoneE164(phone), insurancePlan, careType,
           preferredLanguage: lang,
           homeZip: zip || undefined,
           homeLat: coords?.lat, homeLng: coords?.lng,
@@ -132,11 +134,11 @@ export default function Onboarding() {
               <input className={inputClass} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Maya" />
             </Field>
             <Field label={C.phoneLabel} help={C.phoneHelp}>
-              <input className={inputClass} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 404 555 0100" />
+              <input className={inputClass} type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(404) 555-0100" />
             </Field>
             <Field label={C.dobLabel} help={C.dobHelp}>
               <input className={inputClass} inputMode="numeric" autoComplete="off" value={localOnly.dob}
-                onChange={(e) => setLocalOnly({ ...localOnly, dob: e.target.value })} placeholder="MM / DD / YYYY" />
+                onChange={(e) => setLocalOnly({ ...localOnly, dob: formatDob(e.target.value) })} placeholder="MM / DD / YYYY" />
             </Field>
           </div>
         </>
@@ -186,19 +188,20 @@ export default function Onboarding() {
           <Title sub={C.careHelp}>{C.careTitle}</Title>
           <Field label={C.careTypeLabel}>
             <div className="flex rounded-full bg-mist p-1">
-              {(Object.keys(C.careTypes) as CareType[]).map((k) => (
+              {(["both", "psychiatry"] as const).map((k) => (
                 <button type="button" key={k} onClick={() => setCareType(k)}
                   className={`flex-1 rounded-full py-2 text-sm font-bold ${careType === k ? "bg-brand text-white" : "text-navy"}`}>
-                  {C.careTypes[k]}
+                  {C.careTypes[k]}{k === "both" ? " ✓" : ""}
                 </button>
               ))}
             </div>
+            <p className={`mt-2 rounded-xl px-3 py-2 text-xs ${careType === "both" ? "bg-mint text-forest" : "bg-attn-tint text-attn-text"}`}>{C.careRecommend}</p>
           </Field>
 
           {showMed && (
             <Card className="mt-4 space-y-4">
               <Field label={C.medLabel} help={C.medHelp}>
-                <input className={inputClass} value={medLabel} onChange={(e) => setMedLabel(e.target.value)} placeholder="Sertraline 50 mg" />
+                <SuggestInput value={medLabel} onChange={setMedLabel} placeholder="Sertraline 50 mg" label={C.medLabel} />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label={C.daysLeftLabel}>

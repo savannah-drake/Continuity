@@ -55,35 +55,36 @@ function blend(buf, i, rgb, a) {
   buf[i + 3] = 255;
 }
 
-// The still image: background, mascot (or mark), and a small brand bar at the bottom
+// The still image. Mascot: white background, the mascot fitted to the frame (Ivy's art has a white background).
+// No mascot: the Continuity mark (brand circle + white plus) on the light blue canvas.
 function drawBase(mascot) {
   const buf = new Uint8ClampedArray(W * H * 4);
-  for (let p = 0; p < W * H; p++) { buf[p * 4] = BG[0]; buf[p * 4 + 1] = BG[1]; buf[p * 4 + 2] = BG[2]; buf[p * 4 + 3] = 255; }
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4;
-      const d = Math.hypot(x - CX, y - CY);
-      if (mascot) {
-        // Scale the mascot to fit the circle
-        if (d <= R) {
-          const sx = Math.floor(((x - (CX - R)) / (2 * R)) * mascot.width);
-          const sy = Math.floor(((y - (CY - R)) / (2 * R)) * mascot.height);
-          const j = (sy * mascot.width + sx) * 4;
-          blend(buf, i, MIST, Math.min(1, R - d));                    // soft disc behind the mascot
-          const a = mascot.data[j + 3] / 255;
-          if (a > 0) blend(buf, i, [mascot.data[j], mascot.data[j + 1], mascot.data[j + 2]], a);
-        }
-      } else {
-        // Continuity mark: brand circle with a white plus
+  const bg = mascot ? [255, 255, 255] : BG;
+  for (let p = 0; p < W * H; p++) { buf[p * 4] = bg[0]; buf[p * 4 + 1] = bg[1]; buf[p * 4 + 2] = bg[2]; buf[p * 4 + 3] = 255; }
+  if (mascot) {
+    const size = Math.min(W - 40, H - 160);           // square area for the mascot
+    const left = Math.round((W - size) / 2), top0 = Math.round(H * 0.42 - size / 2);
+    for (let y = 0; y < size; y++) {
+      const sy = Math.floor((y / size) * mascot.height);
+      for (let x = 0; x < size; x++) {
+        const sx = Math.floor((x / size) * mascot.width);
+        const j = (sy * mascot.width + sx) * 4, a = mascot.data[j + 3] / 255;
+        if (a > 0) blend(buf, ((top0 + y) * W + (left + x)) * 4, [mascot.data[j], mascot.data[j + 1], mascot.data[j + 2]], a);
+      }
+    }
+  } else {
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4, d = Math.hypot(x - CX, y - CY);
         const edge = Math.min(1, Math.max(0, R - d));
         if (edge > 0) blend(buf, i, BRAND, edge);
         const ax = Math.abs(x - CX), ay = Math.abs(y - CY);
         if (d < R - 4 && ((ax < 26 && ay < 100) || (ay < 26 && ax < 100))) blend(buf, i, [255, 255, 255], 1);
       }
-      // Brand bar along the bottom
-      if (y > H - 70 && y < H - 62 && Math.abs(x - CX) < 60) blend(buf, i, NAVY, 1);
     }
   }
+  // Brand bar along the bottom
+  for (let y = H - 70; y < H - 62; y++) for (let x = CX - 60; x < CX + 60; x++) blend(buf, (y * W + x) * 4, NAVY, 1);
   return buf;
 }
 
@@ -110,7 +111,7 @@ export async function startAvatar(room, isSpeaking) {
   const markBase = mascot ? null : drawBase(null);
   const markFrames = markBase ? Array.from({ length: STEPS + 1 }, (_, k) => drawFrame(markBase, k / STEPS)) : null;
   const idleFrames = mascot ? mascot.idle.map((m) => drawBase(m)) : null;
-  const talkFrames = mascot ? mascot.talk.map((m) => drawFrame(drawBase(m), 0.6)) : null;
+  const talkFrames = mascot ? mascot.talk.map((m) => drawBase(m)) : null; // the mouth animation is the 'talking' cue
 
   const source = new VideoSource(W, H);
   // Same calls as Chert's examples/video-agent: one camera track, published by the agent that speaks
