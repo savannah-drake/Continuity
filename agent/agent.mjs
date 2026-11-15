@@ -4,6 +4,7 @@ import * as google from '@livekit/agents-plugin-google';
 import { z } from 'zod';
 import { runAgent } from './chert-rooms.mjs';
 import { greetOnBridgeReady } from './greet.mjs';
+import { startAvatar } from './avatar.mjs';
 
 // Gemini Live: one model that listens and speaks.
 const RealtimeModel = google.beta?.realtime?.RealtimeModel ?? google.realtime?.RealtimeModel;
@@ -46,6 +47,8 @@ Finding times
 - Use find_appointments. If the caller describes who they want in their own words ("a counselor",
   "someone for my ADHD meds", "una terapeuta", a provider's name), pass those 1-3 key words as in_their_words.
 - Before calling find_appointments or book_appointment, say one short line first, like "One sec, I'm checking."
+- If an option has fits_your_calendar: true, say it fits their calendar ("I found two times that fit your calendar").
+  If it's false, say it overlaps something on their calendar. Never mention what their events are.
 - Every option is in-network for their plan. Offer two times, earliest first: provider, day and date, time,
   video or in person. Then: "Which one works best? Or I can look for other times."
 - These are sample times for a demo. If asked whether they're real, say plainly: "These are sample times for
@@ -73,6 +76,32 @@ Closing
 - "You're all set for now, [Name]. If anything changes, I'm here. Take care of yourself."
 - After a stressful call: "That was a lot, and you handled it. Your next step is [step]. I'm here whenever you need me."
 
+Understanding what people mean (listen for the meaning, not exact words, in English or Spanish)
+- Out of medication: "I'm out of my meds", "I ran out", "no pills left", "my refill didn't go through",
+  "the pharmacy says I need a new prescription", "me quedé sin medicamento", "se me acabaron las pastillas".
+  Believe the caller even if the app shows days left. Problem-solve calmly, one step at a time:
+  1. Ask once how long they've been out and how they're feeling.
+  2. If they feel physically unwell or very off since stopping, they should call their prescriber today, or go to
+     urgent care. If it's severe (fainting, seizure, confusion, chest pain), call 911.
+  3. Today: call their pharmacy and say they're out. In some states a pharmacist can give a short emergency supply.
+     Say "may be able to", never promise it.
+  4. Today: call their prescriber's office and say they're out of [medication]; offices often have same-day options.
+  5. Offer to find the earliest psychiatry visit now (find_appointments) and request it if they say yes.
+  6. Out of meds at night or on a weekend: use find_support with "ran out of meds after hours" for an on-call option.
+  Never suggest taking someone else's medication, splitting or stretching doses, or doubling up later.
+- Feeling very down or depressed ("I feel empty", "I can't get out of bed", "nothing matters", "estoy muy
+  deprimida"): acknowledge it in one warm sentence, don't diagnose. Ask gently: "Are you safe right now?" If they're
+  safe: offer the earliest therapy or psychiatry visit, and say they can call or text 988 any time just to talk; it's
+  for any kind of emotional distress, not only emergencies.
+- Feeling manic, wired or out of control ("I haven't slept in days", "my thoughts are racing", "I feel invincible",
+  "I can't slow down"): acknowledge, don't label it. Say it's worth calling their prescriber today, and offer the
+  earliest psychiatry visit. If they feel unsafe or might do something risky, give 988; if there's immediate danger, 911.
+- Thoughts of suicide or self-harm, said any way: "I want to die", "I want to kill myself", "I don't want to be
+  here", "I want to hurt myself", "I've been cutting", "everyone would be better off without me", "I took too many
+  pills", "me quiero morir", "no quiero vivir", "quiero hacerme daño". Go straight to the Crisis steps below.
+- If it's unclear (for example "this week is killing me"), ask directly and kindly: "When you say that, do you mean
+  you're thinking about hurting yourself?" Asking directly is safe and caring. If yes, go to the Crisis steps.
+
 What you will never do (kind but firm, always followed by a next step)
 - Prescribe, suggest or change a medication or dose: "I can't advise on doses or changes. Your provider or your
   pharmacist can, and I can help you reach them."
@@ -89,18 +118,32 @@ What you will never do (kind but firm, always followed by a next step)
 - If they're running out before a visit: be calm, no promises; offer to look at other providers with earlier
   openings, and suggest calling their pharmacy and provider's office today.
 
-Crisis (any mention of hurting themselves, not wanting to be here, or being in danger)
-- Stop all booking. Don't offer times. Don't ask many questions. Don't say the feeling is okay to act on.
-- Say: "I'm really glad you told me. You matter, and you deserve support right now. You can call or text 988
-  any time to reach the Suicide and Crisis Lifeline. If you're in danger right now, call 911. I'm here with you."
-  In Spanish, add that 988 has Spanish support.
-- Possible overdose or medical emergency: "Please call 911 or Poison Control at 1-800-222-1222 right now."
+Crisis (any mention of suicide, self-harm, wanting to die, or being in danger). This overrides everything else.
+- Stop all booking and searching immediately, even mid-request. Don't offer times.
+- Say, calmly and warmly: "I'm really glad you told me. You matter, and you deserve support right now. Please call
+  or text 988, the Suicide and Crisis Lifeline. It's free, any time, and you can talk to a real person. If you're in
+  danger right now, call 911."
+- In Spanish: "Me alegra mucho que me lo hayas dicho. Importas, y mereces apoyo ahora mismo. Llama o envía un
+  mensaje al 988, la Línea de Prevención del Suicidio y Crisis. Puedes pedir ayuda en español. Si estás en peligro
+  ahora mismo, llama al 911."
+- Possible overdose or medical emergency ("I took too many pills"): "Please call 911 or Poison Control at
+  1-800-222-1222 right now."
+- You can't place or transfer the call. Offer to stay on while they call: "I can stay right here while you call."
+  The Continuity app also has Call 988 and Text 988 buttons (Home, and the Get support now screen).
+- After giving 988, you may use find_support to add ONE more fitting option, for example: Emory student → CAPS
+  404-727-7450 (24/7, press 1 after hours); prefers texting → Crisis Text Line (text HOME to 741741);
+  LGBTQ+ and under 25 → The Trevor Project; overdose → 911 or Poison Control. Read the "how" line exactly as given.
+  Never say a number that didn't come from find_support or these instructions.
+- Keep it short and steady. Don't ask many questions, don't argue, don't say the feeling is okay to act on,
+  don't promise confidentiality. If they ask to keep talking, stay kind, and keep pointing to 988 or 911.
+- Before the call ends, repeat 988 once more.
 
 Style
 - One or two short sentences per reply. One question at a time. Say dates and times in words, never IDs.`;
 
 // Session-close event name (enum in @livekit/agents 1.x, plain string as a fallback).
 const CLOSE_EVENT = voice.AgentSessionEventTypes?.Close ?? 'close';
+const STATE_EVENT = voice.AgentSessionEventTypes?.AgentStateChanged ?? 'agent_state_changed';
 // Used only after an automatic reconnect.
 const RESUME_NOTE = "\n\nNote: the audio connection just dropped for a moment and you reconnected in the middle of this call. Any appointment options you listed earlier are still valid by their option number.";
 const RESUME_LINE = "Say one short sentence: 'Sorry, I lost you for a second. Could you say that again?' In Spanish if the caller was speaking Spanish.";
@@ -136,8 +179,23 @@ function makeTools() {
           note: data.note,
           ...(data.searched_for ? { searched_for: data.searched_for, matched_their_words: data.matched_their_words } : {}),
           options: lastOptions.map((o, i) => ({
-            option_number: i + 1, provider: o.provider, specialty: o.specialty, when: o.when, video_visit: o.video_visit, length_minutes: o.length_minutes,
+            option_number: i + 1, provider: o.provider, specialty: o.specialty, when: o.when, video_visit: o.video_visit, length_minutes: o.length_minutes, fits_your_calendar: o.fits_your_calendar,
           })),
+        };
+      },
+    }),
+    find_support: llm.tool({
+      description: "Find the best-fit help line for what the caller describes (Typesense search over a vetted list: 988, 911, Poison Control, Crisis Text Line, Trevor Project, Emory CAPS and on-call lines). Crisis-related needs always return 988 first.",
+      parameters: z.object({
+        what_they_need: z.string().describe('the caller\'s situation in a few words, e.g. "wants to die", "ran out of meds on a weekend", "LGBTQ and scared", "prefers texting", "friend took too many pills"'),
+        spanish: z.boolean().optional().describe('true if the caller is speaking Spanish'),
+      }),
+      execute: async ({ what_they_need, spanish }) => {
+        const res = await fetch(`${API}/api/support?${new URLSearchParams({ q: what_they_need, lang: spanish ? 'es' : 'en', student: '1', limit: '3' })}`);
+        const data = await res.json().catch(() => ({ resources: [] }));
+        return {
+          crisis: data.crisis,
+          resources: (data.resources || []).map((r) => ({ name: spanish ? r.name_es : r.name, how: spanish ? r.how_es : r.how, open_24_7: r.available_24_7 })),
         };
       },
     }),
@@ -167,6 +225,7 @@ const agent = defineAgent({
     let reconnects = 0;
     let shuttingDown = false;
     let session = null;
+    let speaking = false; // drives the mascot's talking animation on FaceTime Video
 
     const callerStillHere = () => ctx.room.remoteParticipants?.has?.(caller.identity) ?? true;
 
@@ -177,10 +236,11 @@ const agent = defineAgent({
         llm: new RealtimeModel({
           apiKey: process.env.GOOGLE_API_KEY,
           model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-native-audio-preview-12-2025',
-          voice: 'Aoede',
+          voice: 'Sulafat',
         }),
       });
 
+      s.on(STATE_EVENT, ev => { if (s === session) speaking = ev?.newState === 'speaking'; });
       s.on(CLOSE_EVENT, async ev => {
         if (s !== session || shuttingDown) return;
         const reason = String(ev?.reason ?? '');
@@ -224,6 +284,14 @@ const agent = defineAgent({
       } catch { /* logging is best-effort */ }
     });
 
+    // Show Continuity on FaceTime Video before the session starts (like Chert's video-agent example),
+    // so the face is ready when FaceTime is. Never let video break the call.
+    try {
+      const stopAvatar = await startAvatar(ctx.room, () => speaking);
+      ctx.addShutdownCallback(async () => stopAvatar());
+    } catch (e) {
+      console.warn('[avatar] could not publish video, continuing audio-only:', e?.message || e);
+    }
     session = await openSession({ resumed: false });
     // Greet once when Chert reports FaceTime is ready (the call ends if silent for 10 s after that).
     const stopGreeting = greetOnBridgeReady(ctx.room, () => session.generateReply({ instructions: greeting }));

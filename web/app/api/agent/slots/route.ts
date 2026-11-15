@@ -34,7 +34,10 @@ export async function GET(req: NextRequest) {
   let providers = await search(q);
   let matchedWords = Boolean(q);
   if (q && providers.length === 0) { providers = await search(undefined); matchedWords = false; } // words matched nobody: fall back to the type
-  const slots = await getOpenSlots(providers.map((x: any) => x.provider_id), before ?? undefined, 2);
+  // PB-27: only offer times that fit the caller's calendar; if none fit, fall back to all times (marked as conflicts)
+  const ids = providers.map((x: any) => x.provider_id);
+  let slots = await getOpenSlots(ids, before ?? undefined, 2, { userId: me.user.user_id, onlyFree: true });
+  if ([...slots.values()].every((l) => l.length === 0)) slots = await getOpenSlots(ids, before ?? undefined, 2, { userId: me.user.user_id });
 
   const options = providers
     .flatMap((prov: any) => (slots.get(prov.provider_id) ?? []).map((s: OpenSlot) => ({ prov, s })))
@@ -47,6 +50,7 @@ export async function GET(req: NextRequest) {
       when: spokenWhen(s.slot_start),
       video_visit: s.telehealth,
       length_minutes: s.duration_min,
+      fits_your_calendar: s.fits_calendar, // true / false, or null when they haven't added a calendar
       miles_away: prov.distance_miles,
       in_network: true,
     }));

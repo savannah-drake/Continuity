@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     `DTEND:${stamp(end)}`,
     `SUMMARY:${esc(`Appointment with ${slot.provider_name}`)}`,
     `LOCATION:${esc(slot.telehealth ? "Telehealth" : slot.address)}`,
-    `DESCRIPTION:${esc("Booked with Continuity. Demo appointment: confirm with the office.")}`,
+    `DESCRIPTION:${esc("Requested with Continuity. The office will confirm and check your coverage.")}`,
     "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Appointment tomorrow", `TRIGGER;VALUE=DATE-TIME:${stamp(reminder)}`, "END:VALARM",
     "END:VEVENT", "END:VCALENDAR",
   ].join("\r\n");
@@ -32,7 +32,8 @@ export async function GET(req: Request) {
   return new Response(ics, {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `attachment; filename="continuity-appointment-${slot.slot_id}.ics"`,
+      // inline: iPhone Safari shows "Add to Calendar" instead of saving a file
+      "Content-Disposition": `inline; filename="continuity-appointment-${slot.slot_id}.ics"`,
     },
   });
 }

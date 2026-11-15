@@ -61,20 +61,33 @@ export async function searchProviders(s: ProviderSearch) {
 export type OpenSlot = {
   slot_id: number; provider_id: number; slot_start: string; duration_min: number;
   telehealth: boolean; fits_maya_calendar: boolean | null; fits_sarah_calendar: boolean | null;
+  // PB-27: true/false when the user added their schedule (busy_blocks), null when they haven't
+  fits_calendar: boolean | null;
 };
 
-export async function getOpenSlots(providerIds: number[], before?: string, perProvider = 3) {
+export async function getOpenSlots(providerIds: number[], before?: string, perProvider = 3,
+  opts: { userId?: number; onlyFree?: boolean } = {}) {
   if (providerIds.length === 0) return new Map<number, OpenSlot[]>();
   const cutoff = before ? `${before}T23:59:59-05:00` : "2100-01-01T00:00:00Z";
   const rows = await query<OpenSlot>(
-`SELECT s.slot_id, s.provider_id, s.slot_start, s.duration_min, s.telehealth, s.fits_maya_calendar, s.fits_sarah_calendar
+`SELECT v.*
+FROM (SELECT s.slot_id, s.provider_id, s.slot_start, s.duration_min, s.telehealth, s.fits_maya_calendar, s.fits_sarah_calendar, CASE WHEN $3::int IS NULL OR NOT EXISTS (SELECT 1
+FROM busy_blocks b0
+WHERE b0.user_id = $3
+AND b0.ends_at > now()) THEN NULL ELSE NOT EXISTS (SELECT 1
+FROM busy_blocks b
+WHERE b.user_id = $3
+AND b.starts_at < s.slot_start + s.duration_min * INTERVAL '1 minute'
+AND b.ends_at > s.slot_start) END AS fits_calendar
 FROM appointment_slots s
 WHERE s.provider_id = ANY($1)
 AND s.slot_status = 'open'
 AND s.slot_start > now()
-AND s.slot_start < $2
-ORDER BY s.slot_start`,
-    [providerIds, cutoff],
+AND s.slot_start < $2) v
+WHERE NOT $4::boolean
+OR v.fits_calendar IS NOT FALSE
+ORDER BY v.slot_start`,
+    [providerIds, cutoff, opts.userId ?? null, Boolean(opts.onlyFree)],
   );
   const byProvider = new Map<number, OpenSlot[]>();
   for (const r of rows) {

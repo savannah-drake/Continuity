@@ -6,10 +6,10 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCopy, useLang } from "@/lib/i18n";
-import { useMe, fmtSlot, fmtShort } from "@/lib/useMe";
+import { useMe, fmtSlot, fmtShort, getUserId } from "@/lib/useMe";
 import { Screen, Card, Pill, Avatar, Notice, BottomNav, Eyebrow } from "@/components/ui";
 
-type Slot = { slot_id: number; slot_start: string; duration_min: number; telehealth: boolean };
+type Slot = { slot_id: number; slot_start: string; duration_min: number; telehealth: boolean; fits_calendar: boolean | null };
 type Provider = {
   provider_id: number; provider_name: string; specialty: string; address: string; languages: string[];
   insurance_plans: string[]; telehealth: boolean; distance_miles: number; slots: Slot[];
@@ -47,10 +47,10 @@ function Results() {
   const [sort, setSort] = useState<"soonest" | "nearest">("soonest");
   const [radius, setRadius] = useState(0);
   const [spanish, setSpanish] = useState(false);
-  // Search box (Typesense: typo tolerance + synonyms like "shrink", "terapeuta"). Debounced.
-  const [input, setInput] = useState("");
-  const [q, setQ] = useState("");
-  useEffect(() => { const t = setTimeout(() => setQ(input.trim()), 300); return () => clearTimeout(t); }, [input]);
+  // PB-27: "Only show times when I'm free" (on by default once a calendar is added)
+  const [onlyFree, setOnlyFree] = useState(true);
+  const userId = typeof window !== "undefined" ? getUserId() : null;
+
   useEffect(() => { if (lang === "es") setSpanish(true); }, [lang]);
 
   const lat = me?.user.home_lat ?? null;
@@ -62,9 +62,9 @@ function Results() {
   useEffect(() => {
     setProviders(null); setError(false);
     const qs = new URLSearchParams({
-      slots: "1", sort,
-      // A typed search looks across therapists AND psychiatrists ("terapeuta" from the psychiatrist tab still works)
-      ...(q ? { q } : { type }),
+      type, slots: "1", sort,
+      ...(userId ? { userId: String(userId) } : {}),
+      ...(userId && onlyFree ? { free: "1" } : {}),
       ...(plan ? { plan } : {}), ...(before ? { before } : {}),
       ...(radius ? { radius: String(radius) } : {}),
       ...(spanish ? { language: "Spanish" } : {}),
@@ -74,7 +74,9 @@ function Results() {
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setProviders)
       .catch(() => setError(true));
-  }, [plan, type, before, sort, radius, spanish, lat, lng, q]);
+  }, [plan, type, before, sort, radius, spanish, lat, lng, userId, onlyFree]);
+  // A calendar is connected if any slot came back with a fits_calendar answer
+  const hasCalendar = Boolean(providers?.some((p) => p.slots.some((s) => s.fits_calendar !== null)));
 
   const switchTab = (t: string) =>
     router.replace(`/providers?${new URLSearchParams({ type: t, ...(plan ? { plan } : {}), ...(before ? { before } : {}) })}`);
@@ -83,9 +85,6 @@ function Results() {
     <Screen nav>
       <h1 className="text-[26px] font-bold text-navy">{type === "therapist" ? R.therapistsTitle : R.psychiatristsTitle}</h1>
       <p className="mb-4 text-sm text-muted">{type === "therapist" ? R.therapistsSub : R.psychiatristsSub}</p>
-      <input type="search" value={input} onChange={(e) => setInput(e.target.value)} placeholder={R.searchPlaceholder}
-        aria-label={R.searchPlaceholder}
-        className="mb-4 h-11 w-full rounded-full border border-line bg-white px-4 text-sm text-navy placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand" />
 
       <p className="mb-3 rounded-full bg-mist px-4 py-2 text-center text-xs font-bold text-navy">
         {R.chip(plan, before ? fmtShort(before) : "")}
@@ -105,6 +104,7 @@ function Results() {
         <Chip on={sort === "soonest"} onClick={() => setSort("soonest")}>{R.sortSoonest}</Chip>
         <Chip on={sort === "nearest"} onClick={() => setSort("nearest")}>{R.sortNearest}</Chip>
         <Chip on={spanish} onClick={() => setSpanish(!spanish)}>{R.speaksSpanish}</Chip>
+        {(hasCalendar || !onlyFree) && <Chip on={onlyFree} onClick={() => setOnlyFree(!onlyFree)}>{R.onlyFree}</Chip>}
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
         {RADII.map((mi) => (
@@ -112,6 +112,7 @@ function Results() {
         ))}
       </div>
 
+      {hasCalendar && <p className="mb-2 text-xs text-muted">{R.calendarNote}</p>}
       <div className="mb-4"><Notice>{R.demoNotice}</Notice></div>
 
       {error && <p className="text-sm text-muted">{R.error}</p>}
@@ -141,8 +142,10 @@ function Results() {
                   <div className="flex flex-wrap gap-2">
                     {p.slots.map((s) => (
                       <Link key={s.slot_id} href={`/book/${s.slot_id}`}
-                        className="rounded-full border-2 border-brand px-3 py-1 text-xs font-bold text-brand hover:bg-mist/50">
-                        {fmtSlot(s.slot_start)}{s.telehealth ? ` · ${R.videoShort}` : ""}
+                        className={`rounded-full border-2 px-3 py-1 text-xs font-bold hover:bg-mist/50 ${s.fits_calendar === false ? "border-line text-muted" : "border-brand text-brand"}`}
+                        title={s.fits_calendar === true ? R.fitsCalendar : s.fits_calendar === false ? R.conflicts : undefined}>
+                        {s.fits_calendar === true ? "✓ " : ""}{fmtSlot(s.slot_start)}{s.telehealth ? ` · ${R.videoShort}` : ""}
+                        {s.fits_calendar === false ? ` · ${R.conflictsShort}` : ""}
                       </Link>
                     ))}
                   </div>

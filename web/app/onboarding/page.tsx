@@ -33,6 +33,9 @@ export default function Onboarding() {
   const [localOnly, setLocalOnly] = useState({ dob: "", memberId: "", group: "", holder: "", front: false, back: false });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locNote, setLocNote] = useState<string | null>(null);
+  // PB-27: schedule as a calendar file or link (sent after the account is created; only busy times are kept)
+  const [calFile, setCalFile] = useState<{ name: string; text: string } | null>(null);
+  const [calLink, setCalLink] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +96,13 @@ export default function Onboarding() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       try { localStorage.setItem("continuity_user_id", String(data.userId)); } catch {}
+      if (calFile || calLink.trim()) {
+        // Best effort: a calendar problem never blocks finishing onboarding
+        await fetch("/api/calendar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: data.userId, ...(calFile ? { ics: calFile.text } : { url: calLink.trim() }) }),
+        }).catch(() => {});
+      }
       router.push("/");
     } catch {
       setError(C.error);
@@ -228,6 +238,22 @@ export default function Onboarding() {
 
       {step === 4 && (
         <>
+          <Title sub={C.calendarHelp}>{C.calendarTitle}</Title>
+          <div className="mb-8 space-y-4">
+            <label className={`block cursor-pointer rounded-xl border border-dashed py-3 text-center text-sm font-bold ${calFile ? "border-forest bg-mint text-forest" : "border-line bg-white text-navy"}`}>
+              {calFile ? `✓ ${C.calendarReady(calFile.name)}` : C.calendarUpload}
+              <input type="file" accept=".ics,text/calendar" className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setCalFile({ name: f.name, text: await f.text() });
+                  e.target.value = "";
+                }} />
+            </label>
+            <Field label={C.calendarLinkLabel} help={C.calendarLinkHelp}>
+              <input className={inputClass} value={calLink} onChange={(e) => setCalLink(e.target.value)}
+                placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" autoComplete="off" />
+            </Field>
+          </div>
           <Title sub={C.locationHelp}>{C.locationTitle}</Title>
           <div className="space-y-4">
             <Button kind="secondary" type="button" onClick={useMyLocation}>{C.useMyLocation}</Button>

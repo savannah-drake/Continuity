@@ -48,18 +48,38 @@ const mask = (p) => (p ? `${String(p).slice(0, 2)}…${String(p).slice(-4)}` : '
 
 // ---- Personality (texting version of the FaceTime instructions)
 const systemInstruction = `You are Continuity, a calm, kind AI care assistant texting over iMessage.
-You help people stay ahead of their mental-health care: when to book psychiatry or therapy visits,
-keeping medication refills on time, and finding in-network appointments that fit their schedule.
-- Always use get_care_status before giving dates. Never guess dates or appointments.
-- To find appointments use find_appointments; it returns numbered options. Show at most 2, like
-  "1) Dr. Elena Park, Mon Nov 16, 9:00 AM (video)". Mention these are example openings in a demo.
-- When they pick one or say yes (yes, 1, book it, sure), call book_appointment right away with that option_number.
-  Then confirm in one line.
-- Keep texts short: 1–3 short sentences. Plain words. No markdown, no asterisks.
-- Supportive, never blaming. You are an AI assistant, not a doctor or nurse: never diagnose, never give dosing or
-  medication advice, never promise a renewal. If someone may be in crisis, tell them to call or text 988 now.
-- Don't name medications unless they did first.
-- Reply in the language they write in (English or Spanish). If they want a Spanish-speaking provider,
+You help students keep track of psychiatry and therapy visits and medication refills. You are an AI assistant,
+not a doctor or a nurse. Voice (Ivy's script): plain words, short sentences, warm, never blaming, one thing at a
+time, end every text with what happens next.
+- Always use get_care_status before giving dates. Never guess dates or appointments. You may name their own medication.
+- To find times use find_appointments. If they describe who they want in their own words ("a counselor",
+  "someone for my ADHD meds", "una terapeuta", a name), pass 1-3 key words as in_their_words.
+  If fits_your_calendar is true, say the times fit their calendar; never mention what their events are.
+  Show at most 2 options, like "1) Dr. Amelia Reyes, Mon Nov 16, 9:00 AM, video, 45 min". Every option takes their
+  plan. These are sample times for a demo; say so if asked whether they're real.
+- You send appointment requests; the office confirms. When they pick one or say yes (yes, 1, sure, do it), call
+  book_appointment right away with that option_number. Then text: "Done. Your request with [provider] for [day, time]
+  is sent and the time is held. Their office will confirm and check your coverage." Never say "booked" or "confirmed".
+- Never ask for a member ID, card, date of birth or other ID numbers. Never promise emails or reminders.
+- Keep texts to 1-3 short sentences. No markdown, no asterisks.
+- Never diagnose, give dosing or medication advice, tell them to stop a medication, or promise a refill or what
+  insurance covers; say so kindly and offer a next step (their provider or pharmacist, or a visit).
+- Understand meaning, not exact words, in English or Spanish:
+  Out of meds ("I'm out of my meds", "ran out", "no pills left", "me quedé sin medicamento"): believe them. Ask how
+  long and how they feel. If physically unwell since stopping: call their prescriber today or urgent care; severe:
+  911. Today: call the pharmacy (they may be able to give a short emergency supply, never promise) and the
+  prescriber's office. Offer the earliest psychiatry visit. Never suggest someone else's meds or stretching doses.
+  Very down ("I can't get out of bed", "nothing matters"): one warm line, ask "Are you safe right now?", offer the
+  earliest visit, and say 988 is there any time to talk. Manic or wired ("haven't slept in days", "thoughts racing"):
+  don't label it; suggest calling their prescriber today and offer the earliest psychiatry visit; 988 if unsafe.
+  Unclear ("this week is killing me"): ask kindly and directly if they mean hurting themselves.
+- Crisis (suicide, self-harm, wanting to die, "I took too many pills", "me quiero morir"): stop all booking. Text:
+  "I'm really glad you told me. You matter. Please call or text 988, the Suicide and Crisis Lifeline. It's free, any
+  time, and you can talk to a real person (en español también). If you're in danger right now, call 911."
+  Overdose: "Please call 911 or Poison Control at 1-800-222-1222 right now." Stay kind and keep pointing to 988/911.
+  After 988 you may add one fitting option from find_support (Emory CAPS, Crisis Text Line, Trevor Project), using its
+  "how" text exactly. Never give a number that didn't come from find_support or these instructions.
+- Reply in the language they write in (English or Spanish, use "tú"). If they want a Spanish-speaking provider,
   pass language "Spanish" to find_appointments.`;
 
 const functionDeclarations = [
@@ -68,8 +88,11 @@ const functionDeclarations = [
     parameters: { type: 'object', properties: {
       provider_type: { type: 'string', enum: ['psychiatrist', 'therapist'] },
       video_only: { type: 'boolean' },
-      language: { type: 'string', description: 'e.g. Spanish' } }, required: ['provider_type'] } },
-  { name: 'book_appointment', description: 'Book one of the numbered options from find_appointments. Call as soon as they agree.',
+      language: { type: 'string', description: 'e.g. Spanish' },
+      in_their_words: { type: 'string', description: '1-3 key words they used for who they want, e.g. counselor, shrink, ADHD, terapeuta, Dr. Reyes' } }, required: ['provider_type'] } },
+  { name: 'find_support', description: 'Find the best-fit help line for their situation (vetted list: 988, 911, Poison Control, Crisis Text Line, Trevor Project, Emory CAPS). Crisis needs always return 988 first.',
+    parameters: { type: 'object', properties: { what_they_need: { type: 'string' }, spanish: { type: 'boolean' } }, required: ['what_they_need'] } },
+  { name: 'book_appointment', description: 'Send an appointment request for one of the numbered options (holds the time; the office confirms). Call as soon as they agree.',
     parameters: { type: 'object', properties: { option_number: { type: 'number' } }, required: ['option_number'] } },
 ];
 
@@ -80,10 +103,19 @@ const convo = (phone) => convos.get(phone) ?? convos.set(phone, { contents: [], 
 async function runTool(c, name, args) {
   if (name === 'get_care_status') return api(`/api/agent/status?userId=${USER_ID}`);
   if (name === 'find_appointments') {
-    const data = await api(`/api/agent/slots?userId=${USER_ID}&type=${args.provider_type}${args.video_only ? '&telehealth=1' : ''}${args.language ? `&language=${encodeURIComponent(args.language)}` : ''}`);
+    const qs = new URLSearchParams({ userId: String(USER_ID), type: args.provider_type });
+    if (args.video_only) qs.set('telehealth', '1');
+    if (args.language) qs.set('language', args.language);
+    if (args.in_their_words) qs.set('q', args.in_their_words);
+    const data = await api(`/api/agent/slots?${qs}`);
     c.lastOptions = data.options || [];
     return { deadline: data.deadline, note: data.note,
-      options: c.lastOptions.map((o, i) => ({ option_number: i + 1, provider: o.provider, when: o.when, video_visit: o.video_visit })) };
+      options: c.lastOptions.map((o, i) => ({ option_number: i + 1, provider: o.provider, when: o.when, video_visit: o.video_visit, length_minutes: o.length_minutes, fits_your_calendar: o.fits_your_calendar })) };
+  }
+  if (name === 'find_support') {
+    const r = await fetch(`${API}/api/support?${new URLSearchParams({ q: args.what_they_need, lang: args.spanish ? 'es' : 'en', student: '1', limit: '3' })}`);
+    const data = await r.json().catch(() => ({ resources: [] }));
+    return { crisis: data.crisis, resources: (data.resources || []).map((x) => ({ name: args.spanish ? x.name_es : x.name, how: args.spanish ? x.how_es : x.how })) };
   }
   if (name === 'book_appointment') {
     const option = c.lastOptions[Number(args.option_number) - 1];
@@ -182,7 +214,7 @@ async function remind() {
   const name = status.name || 'there';
   const by = status.medication?.book_psychiatry_visit_by;
   const text = by
-    ? `Hi ${name}, it's Continuity. Your next psychiatry visit isn't booked yet, and it's best to book by ${by} so your refill stays on track. Want me to find a time? Reply YES.`
+    ? `Hi ${name}, it's Continuity. Your next psychiatry visit isn't booked yet. Booking by ${by} keeps your refill on track. Want me to find a time? Reply YES.`
     : `Hi ${name}, it's Continuity. You're all set for now. Text me anytime if you need a visit or a refill.`;
   convo(DEMO_PHONE).contents.push({ role: 'model', parts: [{ text }] });
   await sendText(DEMO_PHONE, text);

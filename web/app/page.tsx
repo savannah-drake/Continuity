@@ -134,7 +134,17 @@ export default function Home() {
           {mood && (
             <div className="mt-3 rounded-xl bg-white p-3 text-sm text-navy border border-line">
               <p>{COPY.mood.replies[mood]}</p>
-              {mood === COPY.mood.choices[0] && <p className="mt-2 font-bold">{COPY.mood.crisis}</p>}
+              {mood === COPY.mood.choices[0] && (
+                <>
+                  <p className="mt-2 font-bold">{COPY.mood.crisis}</p>
+                  {/* Opens the phone's dialer / messages app. We can't connect the call for them. */}
+                  <div className="mt-3 flex gap-2">
+                    <a href="tel:988" className="flex-1 rounded-full bg-navy py-2 text-center text-sm font-bold text-white">{COPY.help.call988}</a>
+                    <a href={lang === "es" ? "sms:988?&body=AYUDA" : "sms:988"} className="flex-1 rounded-full border-2 border-navy py-2 text-center text-sm font-bold text-navy">{COPY.help.text988}</a>
+                  </div>
+                  <Link href="/help" className="mt-2 block text-center text-sm font-semibold text-brand underline">{COPY.help.link}</Link>
+                </>
+              )}
             </div>
           )}
         </div>

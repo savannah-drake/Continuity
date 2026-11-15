@@ -1,6 +1,7 @@
 // app/api/providers/route.ts
 // GET /api/providers?plan=Aetna%20Student%20Health&type=psychiatrist&before=2026-11-25
-//   optional: q, language, telehealth=1, lat, lng, radius (miles), sort=soonest|nearest, limit, slots=1
+//   optional: q, language, telehealth=1, lat, lng, radius (miles), sort=soonest|nearest, limit, slots=1,
+//             userId (adds fits_calendar to each slot), free=1 (only times that fit the user's calendar)
 import { NextRequest } from "next/server";
 import { searchProviders, getOpenSlots } from "@/lib/providers";
 
@@ -22,7 +23,9 @@ export async function GET(req: NextRequest) {
     });
     if (p.get("slots") !== "1") return Response.json(providers);
 
-    const slots = await getOpenSlots(providers.map((x: any) => x.provider_id), p.get("before") ?? undefined);
+    const userId = Number(p.get("userId")) || undefined;
+    const slots = await getOpenSlots(providers.map((x: any) => x.provider_id), p.get("before") ?? undefined, 3,
+      { userId, onlyFree: p.get("free") === "1" });
     return Response.json(providers.map((x: any) => ({ ...x, slots: slots.get(x.provider_id) ?? [] })));
   } catch (e) {
     console.error("provider search failed", e);

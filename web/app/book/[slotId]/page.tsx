@@ -13,6 +13,9 @@ type Slot = {
   provider_name: string; specialty: string; address: string;
 };
 
+// Google Calendar wants UTC like 20261118T200000Z
+const gcal = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+
 export default function BookPage() {
   const COPY = useCopy();
   const B = COPY.booking;
@@ -92,9 +95,20 @@ export default function BookPage() {
       )}
       {state === "taken" && <Button kind="secondary" onClick={() => router.back()}>{B.pickAnother}</Button>}
       {state === "done" && (
-        <a href={`/api/bookings/ics?slotId=${slotId}`} className="mb-3 block text-center text-sm font-bold text-brand underline">
-          {COPY.booking.addToCalendar}
-        </a>
+        // Apple / Outlook: the .ics opens the phone's "Add to Calendar" sheet. Google: a prefilled event link.
+        <div className="mb-3 flex justify-center gap-4 text-sm font-bold text-brand">
+          <a href={`/api/bookings/ics?slotId=${slotId}`} className="underline">{COPY.booking.addToCalendar}</a>
+          <a className="underline" target="_blank" rel="noreferrer"
+            href={`https://calendar.google.com/calendar/render?${new URLSearchParams({
+              action: "TEMPLATE",
+              text: `Appointment with ${slot.provider_name}`,
+              dates: `${gcal(slot.slot_start)}/${gcal(new Date(new Date(slot.slot_start).getTime() + slot.duration_min * 60000).toISOString())}`,
+              details: "Requested with Continuity. The office will confirm.",
+              location: slot.telehealth ? "Video visit" : "",
+            })}`}>
+            {COPY.booking.addToGoogle}
+          </a>
+        </div>
       )}
       {state === "done" && <ButtonLink href="/">{B.done}</ButtonLink>}
     </Screen>
