@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useCopy } from "@/lib/i18n";
 import type { ReactNode, ButtonHTMLAttributes } from "react";
+import { HomeIcon, CareIcon, TimelineIcon, PersonIcon } from "./icons";
 
 export function Screen({ children, nav = false }: { children: ReactNode; nav?: boolean }) {
   return (
@@ -96,19 +97,20 @@ export function Field({ label, help, children }: { label: string; help?: string;
 }
 export const inputClass = "w-full rounded-[10px] border border-line bg-white px-3 py-2.5 text-[15px] text-navy outline-none focus:border-brand";
 
-export function BottomNav({ active }: { active: "home" | "providers" | "timeline" | "profile" }) {
+export function BottomNav({ active }: { active: "home" | "care" | "providers" | "timeline" | "profile" }) {
   const N = useCopy().nav;
-  const item = (key: typeof active, href: string, label: string, icon: string) => (
-    <Link href={href} className={`flex flex-col items-center gap-0.5 text-[10px] font-bold ${active === key ? "text-brand" : "text-muted"}`}>
-      <span className="text-lg leading-none">{icon}</span>{label}
+  const item = (key: typeof active, href: string, label: string, Icon: typeof HomeIcon) => (
+    <Link href={href} aria-current={active === key ? "page" : undefined}
+      className={`flex flex-col items-center gap-1 text-[11px] font-semibold ${active === key ? "text-navy" : "text-muted"}`}>
+      <Icon size={22} strokeWidth={active === key ? 2.25 : 1.75} />{label}
     </Link>
   );
   return (
-    <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md items-center justify-around border-t border-line bg-white px-6 py-3">
-      {item("profile", "/profile", N.profile, "◯")}
-      {item("providers", "/providers", N.providers, "⌖")}
-      {item("home", "/", N.home, "⌂")}
-      {item("timeline", "/timeline", N.timeline, "☰")}
+    <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md items-center justify-around border-t border-line bg-white/95 px-6 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2.5 backdrop-blur">
+      {item("home", "/", N.home, HomeIcon)}
+      {item("care", "/care", N.care, CareIcon)}
+      {item("timeline", "/timeline", N.timeline, TimelineIcon)}
+      {item("profile", "/profile", N.profile, PersonIcon)}
     </nav>
   );
 }

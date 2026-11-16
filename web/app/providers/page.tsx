@@ -155,7 +155,7 @@ function Results() {
           );
         })}
       </div>
-      <BottomNav active="providers" />
+      <BottomNav active="care" />
     </Screen>
   );
 }

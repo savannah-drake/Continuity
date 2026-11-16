@@ -2,7 +2,7 @@
 "use client";
 import { useCopy } from "@/lib/i18n";
 import { useMe, fmtDay, isoDay, fmtTime, providersHref } from "@/lib/useMe";
-import { Screen, Card, Eyebrow, Pill, ButtonLink, BottomNav, TimelineTabs } from "@/components/ui";
+import { Screen, ButtonLink, BottomNav, TimelineTabs } from "@/components/ui";
 
 type Dot = "today" | "confirmed" | "action" | "end" | "later";
 const dotColor: Record<Dot, string> = {
@@ -17,7 +17,7 @@ export default function TimelinePage() {
   if (state === "loading") return <Screen><p className="text-muted">{COPY.booking.loading}</p></Screen>;
   if (!me) return <Screen><p className="mb-4 text-muted">{T.clear}</p><ButtonLink href="/onboarding">{COPY.home.setup}</ButtonLink></Screen>;
 
-  const med = me.medication;
+  const med = me.medication; // runs out first
   const steps: Step[] = [{ date: me.today, title: T.today, dot: "today" }];
 
   for (const a of me.appointments) {
@@ -25,13 +25,15 @@ export default function TimelinePage() {
       body: `${fmtTime(a.slot_start)} · ${a.telehealth ? COPY.booking.video : COPY.booking.inPerson}`,
       dot: "confirmed", tag: { text: COPY.tags.confirmed, tone: "mint" } });
   }
-  if (med) {
-    if (med.bookApptBy && !med.visitBooked) {
-      steps.push({ date: med.bookApptBy < me.today ? me.today : med.bookApptBy, title: T.bookBy,
-        body: T.bookByBody(med.label), dot: "action", tag: { text: COPY.tags.needsAction, tone: "attn" } });
+  // Every medication gets its own steps
+  const many = me.medications.length > 1;
+  for (const m of me.medications) {
+    if (m.bookApptBy && !m.visitBooked) {
+      steps.push({ date: m.bookApptBy < me.today ? me.today : m.bookApptBy, title: many ? `${T.bookBy} · ${m.label}` : T.bookBy,
+        body: T.bookByBody(m.label), dot: "action", tag: { text: COPY.tags.needsAction, tone: "attn" } });
     }
-    steps.push({ date: med.rxNeededBy, title: T.rxNeededBy, body: T.rxNeededByBody, dot: "later" });
-    steps.push({ date: med.supplyEndDate, title: T.supplyEnd(med.label), body: T.supplyEndBody, dot: "end" });
+    steps.push({ date: m.rxNeededBy, title: many ? `${T.rxNeededBy} · ${m.label}` : T.rxNeededBy, body: T.rxNeededByBody, dot: "later" });
+    steps.push({ date: m.supplyEndDate, title: T.supplyEnd(m.label), body: T.supplyEndBody, dot: "end" });
   }
   if (me.therapy && !me.therapy.sessionBooked) {
     steps.push({ date: me.therapy.bookBy < me.today ? me.today : me.therapy.bookBy, title: T.therapyBookBy,
@@ -44,28 +46,27 @@ export default function TimelinePage() {
   return (
     <Screen nav>
       <TimelineTabs active="timeline" />
-      <Eyebrow>{T.eyebrow}</Eyebrow>
-      <h1 className="mt-1 text-[26px] font-bold text-navy">{T.title}</h1>
+      <h1 className="text-[26px] font-bold text-navy">{T.title}</h1>
       <p className="mb-5 text-sm text-muted">{T.sub}</p>
 
       {nextAction && (
-        <Card tone="attn" className="mb-6">
-          <Eyebrow className="!text-attn-text">{T.nextStep}</Eyebrow>
-          <p className="font-bold text-attn-text">{T.bookBy} by {fmtDay(nextAction.bookApptBy!)}</p>
-          <p className="text-xs text-attn-text">{nextAction.renewalReason ? COPY.renewalReasons[nextAction.renewalReason] : T.bookByBody(nextAction.label)}</p>
-        </Card>
+        <div className="mb-6 border-l-2 border-attn pl-3">
+          <p className="text-sm text-muted">{T.nextStep}</p>
+          <p className="font-bold text-navy">{COPY.home.bookBy(fmtDay(nextAction.bookApptBy!))}</p>
+          <p className="text-sm text-muted">{nextAction.renewalReason ? COPY.renewalReasons[nextAction.renewalReason] : T.bookByBody(nextAction.label)}</p>
+        </div>
       )}
 
       <ol className="relative ml-2 border-l-2 border-mist pl-6">
         {steps.map((s, i) => (
           <li key={i} className="relative mb-6">
             <span className={`absolute -left-[33px] top-1 h-3.5 w-3.5 rounded-full border-[3px] bg-white ${dotColor[s.dot]}`} />
-            <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
-              {s.dot === "today" ? `Today · ${fmtDay(s.date)}` : fmtDay(s.date)}
+            <p className="text-xs text-muted">
+              {s.dot === "today" ? `${T.today} · ${fmtDay(s.date)}` : fmtDay(s.date)}
             </p>
-            <p className="font-bold text-navy">{s.title}</p>
-            {s.body && <p className="text-xs text-muted">{s.body}</p>}
-            {s.tag && <div className="mt-1"><Pill tone={s.tag.tone}>{s.tag.text}</Pill></div>}
+            <p className="font-semibold text-navy">{s.title}</p>
+            {s.body && <p className="text-sm text-muted">{s.body}</p>}
+            {s.tag && <p className={`mt-0.5 text-xs font-semibold ${s.tag.tone === "attn" ? "text-attn-text" : "text-forest"}`}>{s.tag.text}</p>}
           </li>
         ))}
       </ol>

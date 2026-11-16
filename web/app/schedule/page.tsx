@@ -114,7 +114,7 @@ export default function SchedulePage() {
         {todaysVisits.map((a) => {
           const end = new Date(new Date(a.slot_start).getTime() + a.duration_min * 60000).toISOString();
           return (
-            <div key={a.slot_id} className="absolute left-14 right-3 rounded-lg bg-brand px-2 py-1 text-[11px] font-bold text-white"
+            <div key={`${a.visit_id ?? a.slot_id}-${a.slot_start}`} className="absolute left-14 right-3 rounded-lg bg-brand px-2 py-1 text-[11px] font-bold text-white"
               style={{ top: top(a.slot_start) + 4, height: height(a.slot_start, end) }}>
               {S.visitWith(a.provider_name, t(a.slot_start))}
             </div>

@@ -2,6 +2,7 @@
 // Provider search over Typesense. Used by /api/providers now and the FaceTime agent later.
 import { typesenseSearch } from "./typesense";
 import { query } from "./db";
+import { syncGoogleBusy } from "./busy";
 
 const EMORY = { lat: 33.7925, lng: -84.324 };
 
@@ -68,6 +69,7 @@ export type OpenSlot = {
 export async function getOpenSlots(providerIds: number[], before?: string, perProvider = 3,
   opts: { userId?: number; onlyFree?: boolean } = {}) {
   if (providerIds.length === 0) return new Map<number, OpenSlot[]>();
+  if (opts.userId) await syncGoogleBusy(opts.userId).catch((e) => console.error("calendar sync failed", e));
   const cutoff = before ? `${before}T23:59:59-05:00` : "2100-01-01T00:00:00Z";
   const rows = await query<OpenSlot>(
 `SELECT v.*

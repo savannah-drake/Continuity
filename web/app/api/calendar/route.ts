@@ -1,17 +1,19 @@
 // /api/calendar: PB-27. Add your schedule so Continuity only offers times you're free.
-// POST { userId, ics?: string (file contents), url?: string (Google/Apple/Outlook "secret iCal address") }
-// GET ?userId=1  -> { connected, upcomingBusy }      GET ?userId=1&days=7 -> + busy: [{start, end}] for the week view
-// DELETE ?userId=1 -> disconnect
+// All for the signed-in user. Google Calendar is connected through /api/auth/google?calendar=1 instead.
+// POST { ics?: string (file contents), url?: string (Apple/Outlook "secret iCal address") }
+// GET  -> { connected, upcomingBusy, google }      GET ?days=7 -> + busy: [{start, end}] for the week view
+// DELETE -> remove the uploaded calendar
 // Only busy start/end times are saved. Titles, places, notes and attendees are never stored.
 import { NextRequest } from "next/server";
 import { saveCalendar, clearCalendar, calendarSummary, busyBetween } from "@/lib/busy";
 import { normalizeCalendarUrl } from "@/lib/calendar";
+import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 
 const MAX_BYTES = 2_000_000;
 
 export async function GET(req: NextRequest) {
-  const userId = Number(req.nextUrl.searchParams.get("userId"));
-  if (!Number.isInteger(userId) || userId <= 0) return Response.json({ error: "userId required" }, { status: 400 });
+  const userId = await getSessionUserId();
+  if (!userId) return unauthorizedJson();
   const days = Math.min(Number(req.nextUrl.searchParams.get("days")) || 0, 14);
   const summary = await calendarSummary(userId);
   if (!days) return Response.json(summary);
@@ -22,16 +24,16 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const userId = Number(req.nextUrl.searchParams.get("userId"));
-  if (!Number.isInteger(userId) || userId <= 0) return Response.json({ error: "userId required" }, { status: 400 });
+  const userId = await getSessionUserId();
+  if (!userId) return unauthorizedJson();
   await clearCalendar(userId);
   return Response.json({ connected: false });
 }
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const userId = Number(body.userId);
-  if (!Number.isInteger(userId) || userId <= 0) return Response.json({ error: "userId required" }, { status: 400 });
+  const userId = await getSessionUserId();
+  if (!userId) return unauthorizedJson();
 
   let ics: string = typeof body.ics === "string" ? body.ics : "";
   if (!ics && typeof body.url === "string" && body.url.trim()) {

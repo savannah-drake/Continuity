@@ -1,15 +1,21 @@
 // app/profile/page.tsx: Your profile. See and change what Continuity uses to find care:
-// name, plan, language, home ZIP, and your schedule (busy times only). Sign-in is per device for the demo.
+// name, plan, language, home ZIP, and your calendar (Google Calendar, or an uploaded file; busy times only).
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMe, getUserId } from "@/lib/useMe";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMe, signOut as endSession } from "@/lib/useMe";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { PLANS } from "@/lib/copy";
-import { Screen, Card, Button, ButtonLink, Field, Notice, BottomNav, inputClass } from "@/components/ui";
+import { Screen, Button, ButtonLink, Field, BottomNav, inputClass } from "@/components/ui";
 
-export default function ProfilePage() {
+type CalStatus = { upcomingBusy: number; fileBusy?: number; google?: { connected: boolean; lastSynced?: string | null; needsReconnect?: boolean } };
+
+export default function ProfilePageWrapper() {
+  return <Suspense fallback={null}><ProfilePage /></Suspense>;
+}
+
+function ProfilePage() {
   const C = useCopy();
   const P = C.profile;
   const lang = useLang();
@@ -19,9 +25,11 @@ export default function ProfilePage() {
   const [plan, setPlan] = useState("");
   const [zip, setZip] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [busy, setBusy] = useState<number | null>(null);
-  const [calNote, setCalNote] = useState<string | null>(null);
-  const userId = typeof window !== "undefined" ? getUserId() : null;
+  const [cal, setCal] = useState<CalStatus | null>(null);
+  const params = useSearchParams();
+  const S = C.calendarSync;
+  const [calNote, setCalNote] = useState<string | null>(
+    params.get("calendar") === "connected" ? S.connectedNote : params.get("calendar") === "declined" ? S.declinedNote : null);
   // Profile photo: shrunk to 160px and kept in this browser only (never uploaded)
   const [photo, setPhoto] = useState<string | null>(null);
   useEffect(() => { try { setPhoto(localStorage.getItem("continuity_photo")); } catch { /* private mode */ } }, []);
@@ -49,16 +57,15 @@ export default function ProfilePage() {
   }, [me]);
 
   const loadCalendar = () => {
-    if (!userId) return;
-    fetch(`/api/calendar?userId=${userId}`).then((r) => r.json()).then((d) => setBusy(d.upcomingBusy ?? 0)).catch(() => {});
+    fetch("/api/calendar").then((r) => (r.ok ? r.json() : null)).then((d) => d && setCal(d)).catch(() => {});
   };
-  useEffect(loadCalendar, [userId]);
+  useEffect(loadCalendar, []);
 
   async function save() {
     setStatus("saving");
     const res = await fetch("/api/users", {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: Number(userId), displayName: name, insurancePlan: plan, preferredLanguage: lang, ...(zip ? { homeZip: zip } : {}) }),
+      body: JSON.stringify({ displayName: name, insurancePlan: plan, preferredLanguage: lang, ...(zip ? { homeZip: zip } : {}) }),
     }).catch(() => null);
     setStatus(res?.ok ? "saved" : "error");
   }
@@ -66,20 +73,26 @@ export default function ProfilePage() {
   async function uploadCalendar(file: File) {
     const res = await fetch("/api/calendar", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: Number(userId), ics: await file.text() }),
+      body: JSON.stringify({ ics: await file.text() }),
     }).catch(() => null);
     setCalNote(res?.ok ? P.calendarUpdated : C.onboarding.calendarFailed);
     loadCalendar();
   }
 
   async function removeCalendar() {
-    await fetch(`/api/calendar?userId=${userId}`, { method: "DELETE" }).catch(() => {});
+    await fetch("/api/calendar", { method: "DELETE" }).catch(() => {});
     setCalNote(null);
     loadCalendar();
   }
 
-  function signOut() {
-    try { localStorage.removeItem("continuity_user_id"); } catch { /* private mode */ }
+  async function disconnectGoogle() {
+    await fetch("/api/auth/calendar", { method: "DELETE" }).catch(() => {});
+    setCalNote(null);
+    loadCalendar();
+  }
+
+  async function signOut() {
+    await endSession();
     router.push("/");
   }
 
@@ -113,7 +126,7 @@ export default function ProfilePage() {
       </div>
       <p className="-mt-3 mb-4 text-[11px] text-muted">{P.photoNote}</p>
 
-      <Card className="mb-4 space-y-4">
+      <div className="mb-8 space-y-4">
         <Field label={P.name}>
           <input className={inputClass} value={name} onChange={(e) => { setName(e.target.value); setStatus("idle"); }} />
         </Field>
@@ -139,24 +152,42 @@ export default function ProfilePage() {
         <Button onClick={save} disabled={status === "saving"}>{status === "saving" ? P.saving : P.save}</Button>
         {status === "saved" && <p className="text-sm font-bold text-forest">{P.saved}</p>}
         {status === "error" && <p className="text-sm font-bold text-attn-text">{P.error}</p>}
-      </Card>
+      </div>
 
-      <Card className="mb-4">
-        <p className="mb-1 font-bold text-navy">{P.calendar}</p>
-        <p className="mb-3 text-sm text-muted">{busy ? P.calendarOn(busy) : P.calendarOff}</p>
-        <label className="mb-2 block cursor-pointer rounded-xl border border-dashed border-line bg-white py-3 text-center text-sm font-bold text-navy">
-          {P.calendarUpload}
-          <input type="file" accept=".ics,text/calendar" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCalendar(f); e.target.value = ""; }} />
-        </label>
-        <div className="flex justify-between">
-          <Link href="/schedule" className="text-sm font-semibold text-brand underline">{C.schedule.link}</Link>
-          {busy ? <button type="button" onClick={removeCalendar} className="text-sm font-semibold text-muted underline">{P.calendarRemove}</button> : null}
+      <section className="mb-8">
+        <h2 className="mb-2 text-[15px] font-bold text-navy">{S.title}</h2>
+        <div className="rounded-2xl border border-line bg-white px-4 py-3">
+          {cal?.google?.connected ? (
+            <>
+              <p className="font-semibold text-navy">{cal.google.needsReconnect ? S.reconnect : S.connected}</p>
+              {cal.google.lastSynced && !cal.google.needsReconnect && (
+                <p className="text-sm text-muted">{S.lastSynced(new Date(cal.google.lastSynced).toLocaleString(lang === "es" ? "es-US" : "en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }))}</p>
+              )}
+              <div className="mt-2 flex gap-5 text-sm font-semibold">
+                {cal.google.needsReconnect && <a href="/api/auth/google?calendar=1&next=/profile" className="text-brand">{S.connect}</a>}
+                <button type="button" onClick={disconnectGoogle} className="text-muted">{S.disconnect}</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-muted">{S.explain}</p>
+              <a href="/api/auth/google?calendar=1&next=/profile" className="flex h-11 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{S.connect}</a>
+            </>
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <label className="cursor-pointer font-semibold text-brand">
+            {P.calendarUpload}
+            <input type="file" accept=".ics,text/calendar" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCalendar(f); e.target.value = ""; }} />
+          </label>
+          {cal?.fileBusy ? <button type="button" onClick={removeCalendar} className="text-muted">{P.calendarRemove}</button> : null}
+          <Link href="/schedule" className="font-semibold text-navy">{C.schedule.link}</Link>
         </div>
         {calNote && <p className="mt-2 text-sm text-muted">{calNote}</p>}
-      </Card>
+      </section>
 
-      <div className="mb-4"><Notice>{P.privacy}</Notice></div>
+      <p className="mb-6 text-xs text-muted">{P.privacy}</p>
 
       <div className="mb-2 flex justify-between text-sm font-semibold">
         <Link href="/onboarding" className="text-brand underline">{P.redo}</Link>

@@ -1,13 +1,14 @@
-// app/onboarding/page.tsx: 4 steps (About you → Insurance → Your care → Your location), Ivy's Onboarding mockup.
+// app/onboarding/page.tsx: 4 steps (About you → Insurance → Your care → Calendar and location), after Google sign-in.
 // Language (English/Español) can be switched on step 1; location saves home_lat/home_lng for Typesense geo search.
 "use client";
-import { formatPhone, formatDob, phoneE164 } from "@/lib/format";
+import { formatPhone, phoneE164 } from "@/lib/format";
 import { SuggestInput } from "@/components/Suggest";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMe } from "@/lib/useMe";
 import { useRouter } from "next/navigation";
 import { PLANS } from "@/lib/copy";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
-import { Screen, Title, Progress, Field, inputClass, Button, Notice, Card } from "@/components/ui";
+import { Screen, Title, Progress, Field, inputClass, Button } from "@/components/ui";
 
 type CareType = "psychiatry" | "therapy" | "both";
 const TOTAL = 4;
@@ -17,6 +18,7 @@ export default function Onboarding() {
   const C = COPY.onboarding;
   const lang = useLang();
   const router = useRouter();
+  const { me, state } = useMe();
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
@@ -31,8 +33,8 @@ export default function Onboarding() {
   const [lastSession, setLastSession] = useState("");
   const [cadence, setCadence] = useState(14);
   const [zip, setZip] = useState("");
-  // Ivy's insurance fields are shown for the design but kept in this screen only: never sent or saved.
-  const [localOnly, setLocalOnly] = useState({ dob: "", memberId: "", group: "", holder: "", front: false, back: false });
+  const [reminderTime, setReminderTime] = useState("");
+  const [connectGoogle, setConnectGoogle] = useState(true);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locNote, setLocNote] = useState<string | null>(null);
   // PB-27: schedule as a calendar file or link (sent after the account is created; only busy times are kept)
@@ -41,12 +43,15 @@ export default function Onboarding() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Must be signed in (Google) to set up; prefill the name Google gave us
+  useEffect(() => { if (state === "none") router.replace("/"); }, [state, router]);
+  useEffect(() => { if (me?.user.display_name) setDisplayName((n) => n || me.user.display_name!); }, [me]);
+
   const showMed = careType !== "therapy";
   const showTherapy = careType !== "psychiatry";
 
   function next() {
     setError(null);
-    if (step === 1 && !phone.trim()) return setError(C.missing(C.phoneLabel.toLowerCase()));
     setStep(step + 1);
   }
 
@@ -83,31 +88,31 @@ export default function Onboarding() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          displayName, phone: phoneE164(phone), insurancePlan, careType,
+          displayName, phone: phone.trim() ? phoneE164(phone) : undefined, insurancePlan, careType,
           preferredLanguage: lang,
           homeZip: zip || undefined,
           homeLat: coords?.lat, homeLng: coords?.lng,
           medication: showMed ? {
             label: medLabel || (lang === "es" ? "Tu medicamento" : "Your medication"), daysSupplyRemaining: daysLeft,
             refillsRemaining: refills, rxExpiresOn: expires || null,
-            requiresAppointmentForRenewal: needsAppt, bookingLeadDays: lead,
+            requiresAppointmentForRenewal: needsAppt, bookingLeadDays: lead, reminderTime: reminderTime || null,
           } : undefined,
           therapy: showTherapy && lastSession ? { lastSessionDate: lastSession, cadenceDays: cadence } : undefined,
         }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      try { localStorage.setItem("continuity_user_id", String(data.userId)); } catch {}
-      if (calFile || calLink.trim()) {
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error);
+      if (!connectGoogle && (calFile || calLink.trim())) {
         // Best effort: a calendar problem never blocks finishing onboarding
         await fetch("/api/calendar", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: data.userId, ...(calFile ? { ics: calFile.text } : { url: calLink.trim() }) }),
+          body: JSON.stringify(calFile ? { ics: calFile.text } : { url: calLink.trim() }),
         }).catch(() => {});
       }
+      // Google Calendar: one more Google screen to allow busy times + adding visits and reminders
+      if (connectGoogle) { window.location.href = "/api/auth/google?calendar=1&next=/"; return; }
       router.push("/");
-    } catch {
-      setError(C.error);
+    } catch (e) {
+      setError(String((e as Error)?.message) === "phone_taken" ? C.phoneTaken : C.error);
       setSaving(false);
     }
   }
@@ -136,10 +141,6 @@ export default function Onboarding() {
             <Field label={C.phoneLabel} help={C.phoneHelp}>
               <input className={inputClass} type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(404) 555-0100" />
             </Field>
-            <Field label={C.dobLabel} help={C.dobHelp}>
-              <input className={inputClass} inputMode="numeric" autoComplete="off" value={localOnly.dob}
-                onChange={(e) => setLocalOnly({ ...localOnly, dob: formatDob(e.target.value) })} placeholder="MM / DD / YYYY" />
-            </Field>
           </div>
         </>
       )}
@@ -153,33 +154,8 @@ export default function Onboarding() {
                 {PLANS.map((p) => <option key={p}>{p}</option>)}
               </select>
             </Field>
-            <Field label={C.memberIdLabel} help={C.memberIdHelp}>
-              <input className={inputClass} autoComplete="off" value={localOnly.memberId} onChange={(e) => setLocalOnly({ ...localOnly, memberId: e.target.value })} />
-            </Field>
-            <Field label={C.groupLabel} help={C.groupHelp}>
-              <input className={inputClass} autoComplete="off" value={localOnly.group} onChange={(e) => setLocalOnly({ ...localOnly, group: e.target.value })} />
-            </Field>
-            <Field label={C.holderLabel} help={C.holderHelp}>
-              <input className={inputClass} autoComplete="off" value={localOnly.holder} onChange={(e) => setLocalOnly({ ...localOnly, holder: e.target.value })} />
-            </Field>
-            <Field label={C.cardLabel} help={C.cardHelp}>
-              <div className="flex gap-3">
-                {(["front", "back"] as const).map((side) => (
-                  // Opens the camera / photo picker; the photo is never read or uploaded.
-                  <label key={side}
-                    className={`flex-1 cursor-pointer rounded-xl border border-dashed py-3 text-center text-sm font-bold ${localOnly[side] ? "border-forest bg-mint text-forest" : "border-line bg-white text-navy"}`}>
-                    {localOnly[side] ? `✓ ${C.cardAdded}` : side === "front" ? C.cardFront : C.cardBack}
-                    <input type="file" accept="image/*" capture="environment" className="hidden"
-                      onChange={(e) => { setLocalOnly({ ...localOnly, [side]: Boolean(e.target.files?.length) }); e.target.value = ""; }} />
-                  </label>
-                ))}
-              </div>
-            </Field>
           </div>
-          <div className="mt-4 space-y-2">
-            <Notice>{C.notSaved}</Notice>
-            <Notice>{C.privacyShort}</Notice>
-          </div>
+          <p className="mt-4 text-xs text-muted">{C.privacyShort}</p>
         </>
       )}
 
@@ -191,15 +167,15 @@ export default function Onboarding() {
               {(["both", "psychiatry"] as const).map((k) => (
                 <button type="button" key={k} onClick={() => setCareType(k)}
                   className={`flex-1 rounded-full py-2 text-sm font-bold ${careType === k ? "bg-brand text-white" : "text-navy"}`}>
-                  {C.careTypes[k]}{k === "both" ? " ✓" : ""}
+                  {C.careTypes[k]}
                 </button>
               ))}
             </div>
-            <p className={`mt-2 rounded-xl px-3 py-2 text-xs ${careType === "both" ? "bg-mint text-forest" : "bg-attn-tint text-attn-text"}`}>{C.careRecommend}</p>
+            <p className="mt-2 text-xs text-muted">{C.careRecommend}</p>
           </Field>
 
           {showMed && (
-            <Card className="mt-4 space-y-4">
+            <div className="mt-6 space-y-4 border-t border-line pt-6">
               <Field label={C.medLabel} help={C.medHelp}>
                 <SuggestInput value={medLabel} onChange={setMedLabel} placeholder="Sertraline 50 mg" label={C.medLabel} />
               </Field>
@@ -221,11 +197,15 @@ export default function Onboarding() {
               <Field label={C.leadLabel}>
                 <input className={inputClass} type="number" min={0} value={lead} onChange={(e) => setLead(Number(e.target.value))} />
               </Field>
-            </Card>
+              <Field label={COPY.care.medReminder} help={COPY.care.medReminderHelp}>
+                <input className={inputClass} type="time" value={reminderTime} onChange={(e) => setReminderTime(e.target.value)} />
+              </Field>
+              <p className="text-xs text-muted">{C.moreMedsLater}</p>
+            </div>
           )}
 
           {showTherapy && (
-            <Card className="mt-4 space-y-4">
+            <div className="mt-6 space-y-4 border-t border-line pt-6">
               <Field label={C.lastSessionLabel}>
                 <input className={inputClass} type="date" value={lastSession} onChange={(e) => setLastSession(e.target.value)} />
               </Field>
@@ -234,7 +214,7 @@ export default function Onboarding() {
                   {Object.entries(C.cadences).map(([d, name]) => <option key={d} value={d}>{name}</option>)}
                 </select>
               </Field>
-            </Card>
+            </div>
           )}
         </>
       )}
@@ -243,8 +223,13 @@ export default function Onboarding() {
         <>
           <Title sub={C.calendarHelp}>{C.calendarTitle}</Title>
           <div className="mb-8 space-y-4">
+            <label className="flex items-start gap-3 text-sm text-navy">
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#5AA9D8]" checked={connectGoogle} onChange={(e) => setConnectGoogle(e.target.checked)} />
+              <span><span className="font-bold">{COPY.calendarSync.connect}</span><br /><span className="text-muted">{COPY.calendarSync.explain}</span></span>
+            </label>
+            {!connectGoogle && (<>
             <label className={`block cursor-pointer rounded-xl border border-dashed py-3 text-center text-sm font-bold ${calFile ? "border-forest bg-mint text-forest" : "border-line bg-white text-navy"}`}>
-              {calFile ? `✓ ${C.calendarReady(calFile.name)}` : C.calendarUpload}
+              {calFile ? C.calendarReady(calFile.name) : C.calendarUpload}
               <input type="file" accept=".ics,text/calendar" className="hidden"
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
@@ -256,6 +241,7 @@ export default function Onboarding() {
               <input className={inputClass} value={calLink} onChange={(e) => setCalLink(e.target.value)}
                 placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" autoComplete="off" />
             </Field>
+            </>)}
           </div>
           <Title sub={C.locationHelp}>{C.locationTitle}</Title>
           <div className="space-y-4">
@@ -266,7 +252,7 @@ export default function Onboarding() {
             </Field>
             {locNote && <p className="text-sm text-muted">{locNote}</p>}
           </div>
-          <div className="mt-4"><Notice>{C.privacyShort}</Notice></div>
+          <p className="mt-4 text-xs text-muted">{C.privacyShort}</p>
         </>
       )}
 

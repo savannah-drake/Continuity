@@ -30,8 +30,18 @@ export async function GET(req: NextRequest) {
       book_by: t.sessionBooked ? null : spokenDay(t.bookBy),
       session_booked: t.sessionBooked,
     },
+    // Every active medication (the first one runs out soonest)
+    all_medications: me.medications.map((x) => ({
+      nickname: x.label, days_left: x.daysLeft, runs_out: spokenDay(x.supplyEndDate),
+      book_visit_by: x.visitBooked ? null : spokenDay(x.bookApptBy), daily_reminder_at: x.reminderTime,
+    })),
     upcoming_appointments: me.appointments.map((a: any) => ({
-      provider: a.provider_name, type: a.provider_type, when: spokenWhen(a.slot_start), video: a.telehealth,
+      provider: a.provider_name, type: a.provider_type, when: spokenWhen(a.slot_start), video: a.telehealth, repeats: !!a.recurring,
+    })),
+    // The person's own providers. To book with them, they use the link or phone in the app (you can't book these yourself).
+    care_team: me.careTeam.map((c) => ({
+      who: c.provider_name || `their ${c.role}`, role: c.role,
+      books_through: c.source_site === "zocdoc" ? "Zocdoc" : c.source_site === "grow" ? "Grow Therapy" : c.source_site === "psychologytoday" ? "Psychology Today" : c.booking_url ? "a booking link" : c.phone ? "phone" : null,
     })),
   });
 }
