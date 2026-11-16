@@ -74,6 +74,10 @@ export const COPY_ZH: typeof COPY = {
     notOnCalendar: "已保存。连接 Google 日历后，预约和提醒会显示在你的日历上。",
     calendarFailed: "已保存，但无法添加到 Google 日历。",
     needTeam: "请先添加为你看诊的人。",
+    didYouBook: (who: string) => `你和 ${who} 预约好了吗？`,
+    didYouBookHelp: "添加日期和时间，Continuity 就能据此安排，并放到你的日历上。",
+    yesAddIt: "是的，添加",
+    notYet: "还没有",
     error: "没有保存成功，请再试一次。",
   },
 

@@ -2,7 +2,7 @@
 // the people you see (a booking link from Zocdoc / Grow Therapy / Psychology Today is enough), and your visits,
 // one-off or recurring. Visits and reminders go on Google Calendar when it's connected.
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCopy } from "@/lib/i18n";
 import { useMe, fmtShort, fmtSlot, type MedTimeline, type CareMember } from "@/lib/useMe";
@@ -38,6 +38,16 @@ export default function CarePage() {
   const [visitForm, setVisitForm] = useState<null | VisitDraft>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // After "Book" opens Zocdoc / Grow / etc. in another tab, ask on return whether they booked
+  const [bookingWith, setBookingWith] = useState<number | null>(null);
+  const [askBooked, setAskBooked] = useState<number | null>(null);
+  useEffect(() => {
+    if (!bookingWith) return;
+    const onBack = () => { if (document.visibilityState === "visible") { setAskBooked(bookingWith); setBookingWith(null); } };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => { document.removeEventListener("visibilitychange", onBack); window.removeEventListener("focus", onBack); };
+  }, [bookingWith]);
 
   if (state === "loading") return <Screen nav><p className="text-muted">{C.booking.loading}</p><BottomNav active="care" /></Screen>;
   if (state !== "ready" || !me) {
@@ -66,6 +76,25 @@ export default function CarePage() {
       <h1 className="text-[26px] font-bold text-navy">{K.title}</h1>
       <p className="mb-6 text-sm text-muted">{K.sub}</p>
       {note && <p className="mb-4 text-sm text-navy" role="status">{note}</p>}
+
+      {/* Back from the booking site: save the visit they just booked */}
+      {askBooked && (() => {
+        const who = me.careTeam.find((c) => c.member_id === askBooked);
+        if (!who) return null;
+        return (
+          <div className="mb-6 rounded-2xl border border-brand bg-white px-4 py-3">
+            <p className="font-semibold text-navy">{K.didYouBook(memberName(who, K.roles))}</p>
+            <p className="mb-3 text-sm text-muted">{K.didYouBookHelp}</p>
+            <div className="flex gap-4 text-sm font-semibold">
+              <button className="text-brand" onClick={() => {
+                setVisitForm({ ...emptyVisit(who.member_id), video: who.video }); setAskBooked(null);
+                setTimeout(() => document.getElementById("visit-form")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+              }}>{K.yesAddIt}</button>
+              <button className="text-muted" onClick={() => setAskBooked(null)}>{K.notYet}</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Medications */}
       <Section title={K.meds} action={!medForm && <button className={linkBtn} onClick={() => setMedForm({ m: emptyMed() })}><PlusIcon size={16} />{K.addMed}</button>}>
@@ -112,7 +141,8 @@ export default function CarePage() {
                   <p className="text-sm text-muted">{K.roles[c.role as keyof typeof K.roles] ?? c.role}{c.source_site && SITE_NAMES[c.source_site] ? ` · ${SITE_NAMES[c.source_site]}` : ""}{c.video ? ` · ${K.video}` : ""}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-4 text-sm">
-                  {c.booking_url && <a href={c.booking_url} target="_blank" rel="noopener noreferrer" className={linkBtn}>{K.book}<ExternalIcon size={14} /></a>}
+                  {c.booking_url && <a href={c.booking_url} target="_blank" rel="noopener noreferrer" className={linkBtn}
+                    onClick={() => { setAskBooked(null); setTimeout(() => setBookingWith(c.member_id), 300); }}>{K.book}<ExternalIcon size={14} /></a>}
                   {c.phone && <a href={`tel:${c.phone}`} className={linkBtn} aria-label={K.call}><PhoneIcon size={16} /></a>}
                   <button className="text-muted" disabled={busy} onClick={() => send(`/api/care-team?id=${c.member_id}`, "DELETE")}>{K.remove}</button>
                 </div>
@@ -269,7 +299,7 @@ function VisitEditor({ draft, team, roles, busy, onSave, onCancel }:
   const K = useCopy().care;
   const [d, setD] = useState(draft);
   return (
-    <form className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={(e) => { e.preventDefault(); if (d.when) onSave(d); }}>
+    <form id="visit-form" className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={(e) => { e.preventDefault(); if (d.when) onSave(d); }}>
       <Field label={K.visitWith}>
         <select className={inputClass} value={d.memberId} onChange={(e) => setD({ ...d, memberId: Number(e.target.value) })}>
           {team.map((c) => <option key={c.member_id} value={c.member_id}>{memberName(c, roles)}</option>)}

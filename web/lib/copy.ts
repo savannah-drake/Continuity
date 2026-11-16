@@ -94,6 +94,10 @@ export const COPY = {
     notOnCalendar: "Saved. Connect Google Calendar to get it on your calendar with reminders.",
     calendarFailed: "Saved, but we couldn't add it to Google Calendar.",
     needTeam: "Add someone you see first.",
+    didYouBook: (who: string) => `Did you book with ${who}?`,
+    didYouBookHelp: "Add the date and time so Continuity can plan around it and put it on your calendar.",
+    yesAddIt: "Yes, add it",
+    notYet: "Not yet",
     error: "That didn't save. Try again.",
   },
 
@@ -494,6 +498,10 @@ export const COPY_ES: typeof COPY = {
     notOnCalendar: "Guardado. Conecta Google Calendar para tenerla en tu calendario con recordatorios.",
     calendarFailed: "Guardado, pero no pudimos agregarla a Google Calendar.",
     needTeam: "Primero agrega a alguien que te atienda.",
+    didYouBook: (who: string) => `¿Agendaste con ${who}?`,
+    didYouBookHelp: "Agrega la fecha y la hora para que Continuity lo tenga en cuenta y lo ponga en tu calendario.",
+    yesAddIt: "Sí, agregarla",
+    notYet: "Todavía no",
     error: "No se guardó. Inténtalo otra vez.",
   },
 
