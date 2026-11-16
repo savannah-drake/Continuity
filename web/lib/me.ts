@@ -43,7 +43,7 @@ export async function getMe(userId: number) {
   const today = todayET();
 
   const users = await query(
-`SELECT u.user_id, u.display_name, u.email, u.auto_import_visits, u.insurance_plan, u.care_type, u.home_lat, u.home_lng, u.home_zip, u.preferred_language, to_char(u.last_therapy_session, 'YYYY-MM-DD') AS last_therapy_session, u.therapy_cadence_days
+`SELECT u.user_id, u.display_name, u.email, u.auto_import_visits, u.alert_email, u.insurance_plan, u.care_type, u.home_lat, u.home_lng, u.home_zip, u.preferred_language, to_char(u.last_therapy_session, 'YYYY-MM-DD') AS last_therapy_session, u.therapy_cadence_days
 FROM users u
 WHERE u.user_id = $1`,
     [userId],

@@ -161,14 +161,18 @@ WHERE d.user_id = $1
 UNION
 SELECT v.google_source_event_id
 FROM visits v
+JOIN care_team c ON c.member_id = v.member_id
 WHERE v.user_id = $1
+AND v.status = 'scheduled'
 AND v.google_source_event_id IS NOT NULL`, [userId])).map((r) => r.id));
 
   const out = new Map<string, Suggestion>();
   for (const e of events) {
     const key = e.recurringEventId || e.id;
     if (out.has(key) || skip.has(key) || e.status === "cancelled" || !e.start?.dateTime || !e.end?.dateTime) continue;
-    if (e.source?.title === "Continuity" || matchEvent(e, team)) continue; // already handled by importVisits
+    if (e.source?.title === "Continuity") continue;
+    // Someone on the care team by name: importVisits brings it in, no need to ask
+    if (team.some((m) => m.provider_name && matchEvent(e, [m])?.member)) continue;
     const name = e.summary?.match(WITH_NAME)?.[1]?.replace(/[.,;:]+$/, "");
     if (!name) continue;
     const start = new Date(e.start.dateTime);

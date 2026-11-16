@@ -122,6 +122,7 @@ export async function PATCH(req: Request) {
     add("home_zip", b.homeZip); add("home_lat", c.lat); add("home_lng", c.lng);
   }
   if (typeof b.autoImportVisits === "boolean") add("auto_import_visits", b.autoImportVisits);
+  if (typeof b.alertEmail === "boolean") add("alert_email", b.alertEmail);
   if (!sets.length) return Response.json({ error: "nothing_to_update" }, { status: 400 });
   const r = await pool.query(
 `UPDATE users SET ${sets.join(", ")}

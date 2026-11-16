@@ -3,6 +3,7 @@
 // GET -> { medications }   POST {label, daysSupplyRemaining, refillsRemaining, rxExpiresOn?, requiresAppointmentForRenewal, bookingLeadDays, reminderTime?}
 // PATCH {medicationId, ...same fields}   DELETE ?id=12
 import { NextRequest } from "next/server";
+import { runAlerts } from "@/lib/alerts";
 import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 import { getMe } from "@/lib/me";
 import { cleanMed, upsertMedication, updateMedication, removeMedication, syncMedReminders } from "@/lib/medications";
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
   if (!m) return Response.json({ error: "bad_medication" }, { status: 400 });
   const medicationId = await upsertMedication(userId, m);
   await syncMedReminders(userId).catch((e) => console.error("reminder sync failed", e));
+  await runAlerts(userId, { justSaved: medicationId }).catch((e) => console.error("alert failed", e));
   return Response.json({ medicationId });
 }
 
@@ -33,6 +35,7 @@ export async function PATCH(req: Request) {
   if (!m || !Number.isInteger(id)) return Response.json({ error: "bad_medication" }, { status: 400 });
   if (!(await updateMedication(userId, id, m))) return Response.json({ error: "not_found" }, { status: 404 });
   await syncMedReminders(userId).catch((e) => console.error("reminder sync failed", e));
+  await runAlerts(userId, { justSaved: id }).catch((e) => console.error("alert failed", e));
   return Response.json({ ok: true });
 }
 

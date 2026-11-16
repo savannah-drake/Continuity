@@ -8,6 +8,7 @@ import { useMe, signOut as endSession } from "@/lib/useMe";
 import { localeFor } from "@/lib/copy";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { PLANS } from "@/lib/copy";
+import { AlertSettings } from "@/components/AlertSettings";
 import { Screen, Button, ButtonLink, Field, BottomNav, inputClass } from "@/components/ui";
 
 type CalStatus = { upcomingBusy: number; fileBusy?: number; google?: { connected: boolean; lastSynced?: string | null; needsReconnect?: boolean } };
@@ -207,6 +208,7 @@ function ProfilePage() {
         </div>
         {calNote && <p className="mt-2 text-sm text-muted">{calNote}</p>}
       </section>
+      {me && <AlertSettings emailOn={!!me.user.alert_email} email={me.user.email} />}
 
       <p className="mb-6 text-xs text-muted">{P.privacy}</p>
 
