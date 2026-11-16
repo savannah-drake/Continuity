@@ -9,6 +9,8 @@ import { useMe, fmtShort, fmtSlot, type MedTimeline, type CareMember } from "@/l
 import { SuggestInput } from "@/components/Suggest";
 import { Screen, Field, inputClass, BottomNav } from "@/components/ui";
 import { ExternalIcon, PhoneIcon, PlusIcon } from "@/components/icons";
+import { findLinks } from "@/lib/findLinks";
+import { PLANS } from "@/lib/copy";
 
 const SITE_NAMES: Record<string, string> = { zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", therapyden: "TherapyDen", timelycare: "TimelyCare" };
 
@@ -40,7 +42,16 @@ export default function CarePage() {
   const [busy, setBusy] = useState(false);
   // After "Book" opens Zocdoc / Grow / etc. in another tab, ask on return whether they booked
   const [bookingWith, setBookingWith] = useState<number | null>(null);
+  const [findKind, setFindKind] = useState<"psychiatrist" | "therapist">("psychiatrist");
+  const [findPlan, setFindPlan] = useState<string | null>(null);
   const [askBooked, setAskBooked] = useState<number | null>(null);
+  // Calendar events like "Appointment with Antionette Holt" that might be visits (only when auto-import is on)
+  const [suggestions, setSuggestions] = useState<{ eventId: string; name: string; startsAt: string }[]>([]);
+  const autoImport = !!me?.user.auto_import_visits;
+  useEffect(() => {
+    if (!autoImport) return;
+    fetch("/api/visits/suggestions").then((r) => (r.ok ? r.json() : { suggestions: [] })).then((d) => setSuggestions(d.suggestions ?? [])).catch(() => {});
+  }, [autoImport]);
   useEffect(() => {
     if (!bookingWith) return;
     const onBack = () => { if (document.visibilityState === "visible") { setAskBooked(bookingWith); setBookingWith(null); } };
@@ -63,13 +74,9 @@ export default function CarePage() {
     return res.json().catch(() => ({}));
   }
 
-  const zip = me.user.home_zip || "30322";
-  const find = [
-    { key: "psychologytoday", href: `https://www.psychologytoday.com/us/psychiatrists/${zip}` },
-    { key: "zocdoc", href: "https://www.zocdoc.com/psychiatrists" },
-    { key: "grow", href: "https://growtherapy.com/" },
-    { key: "therapyden", href: "https://www.therapyden.com/" },
-  ] as const;
+  const plan = findPlan ?? me.user.insurance_plan ?? "";
+  const links = findLinks({ plan, kind: findKind, zip: me.user.home_zip });
+  const find = (["psychologytoday", "zocdoc", "grow", "therapyden"] as const).map((key) => ({ key, href: links[key], filtered: links.filtered[key] }));
 
   return (
     <Screen nav>
@@ -96,6 +103,22 @@ export default function CarePage() {
         );
       })()}
 
+      {/* "Is this a visit?" for booking-email events we couldn't place */}
+      {suggestions.map((s) => (
+        <div key={s.eventId} className="mb-4 rounded-2xl border border-brand bg-white px-4 py-3">
+          <p className="font-semibold text-navy">{K.isThisVisit(s.name, fmtSlot(s.startsAt))}</p>
+          <p className="mb-3 text-sm text-muted">{K.isThisVisitHelp}</p>
+          <div className="flex flex-wrap gap-4 text-sm font-semibold">
+            {(["therapist", "psychiatrist", null] as const).map((role) => (
+              <button key={String(role)} disabled={busy} className={role ? "text-brand" : "text-muted"} onClick={async () => {
+                const r = await send("/api/visits/suggestions", "POST", { eventId: s.eventId, role });
+                if (r) setSuggestions((list) => list.filter((x) => x.eventId !== s.eventId));
+              }}>{role === "therapist" ? K.asTherapist : role === "psychiatrist" ? K.asPsychiatrist : K.notAVisit}</button>
+            ))}
+          </div>
+        </div>
+      ))}
+
       {/* Medications */}
       <Section title={K.meds} action={!medForm && <button className={linkBtn} onClick={() => setMedForm({ m: emptyMed() })}><PlusIcon size={16} />{K.addMed}</button>}>
         {me.medications.length === 0 && !medForm && <p className="text-sm text-muted">{K.medsEmpty}</p>}
@@ -108,7 +131,7 @@ export default function CarePage() {
                   <p className="font-semibold text-navy">{m.label}</p>
                   <p className="text-sm text-muted">
                     {K.daysLeftShort(m.daysLeft)} · {K.runsOut(fmtShort(m.supplyEndDate))}
-                    {m.bookApptBy && !m.visitBooked ? ` · ${K.bookBy(fmtShort(m.bookApptBy))}` : ""}
+                    {m.bookApptBy && !m.visitBooked ? ` · ${m.bookApptBy <= me.today ? K.bookNow(fmtShort(m.apptBy ?? m.supplyEndDate)) : K.bookBy(fmtShort(m.bookApptBy))}` : ""}
                   </p>
                   {m.reminderTime && <p className="text-xs text-muted">{K.reminderAt(m.reminderTime)}</p>}
                 </div>
@@ -155,17 +178,27 @@ export default function CarePage() {
             onSave={async (d) => { const ok = await send("/api/care-team", "POST", d); if (ok) setPersonForm(null); }} />
         )}
 
-        <div className="mt-4">
+        <div id="find" className="mt-4 scroll-mt-6">
           <p className="text-sm font-semibold text-navy">{K.find}</p>
           <p className="mb-2 text-xs text-muted">{K.findHelp}</p>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <select aria-label={K.role} className={inputClass} value={findKind} onChange={(e) => setFindKind(e.target.value as "psychiatrist" | "therapist")}>
+              <option value="psychiatrist">{K.roles.psychiatrist}</option>
+              <option value="therapist">{K.roles.therapist}</option>
+            </select>
+            <select aria-label={C.profile.plan} className={inputClass} value={plan} onChange={(e) => setFindPlan(e.target.value)}>
+              {[...new Set([plan, ...PLANS])].filter(Boolean).map((p) => <option key={p}>{p}</option>)}
+            </select>
+          </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {find.map((f) => (
-              <a key={f.key} href={f.href} target="_blank" rel="noopener noreferrer" className={linkBtn}>
+              <a key={f.key} href={f.href} target="_blank" rel="noopener noreferrer" className={linkBtn}
+                title={f.filtered ? K.filteredBy(plan) : K.notFiltered}>
                 {K.findSites[f.key]}<ExternalIcon size={14} />
               </a>
             ))}
-            <Link href={`/providers?${new URLSearchParams({ plan: me.user.insurance_plan || "", type: "psychiatrist" })}`} className={linkBtn}>{K.findSites.continuity}</Link>
           </div>
+          <p className="mt-2 text-xs text-muted">{K.filterNote(find.filter((f) => f.filtered).map((f) => K.findSites[f.key]).join(", "), plan)}</p>
         </div>
       </Section>
 

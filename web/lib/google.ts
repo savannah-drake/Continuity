@@ -123,7 +123,7 @@ async function gcal(userId: number, path: string, init: RequestInit = {}) {
 export type CalEvent = {
   id: string; recurringEventId?: string; status?: string; summary?: string; description?: string; location?: string;
   organizer?: { email?: string }; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string };
-  source?: { title?: string; url?: string };
+  source?: { title?: string; url?: string }; eventType?: string;
 };
 export async function listEvents(userId: number, from: Date, to: Date): Promise<CalEvent[] | null> {
   const out: CalEvent[] = [];
@@ -131,7 +131,7 @@ export async function listEvents(userId: number, from: Date, to: Date): Promise<
   for (let page = 0; page < 5; page++) {
     const qs = new URLSearchParams({
       timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "250",
-      fields: "nextPageToken,items(id,recurringEventId,status,summary,description,location,organizer(email),start,end,source)",
+      fields: "nextPageToken,items(id,recurringEventId,status,summary,description,location,organizer(email),start,end,source,eventType)",
       ...(pageToken ? { pageToken } : {}),
     });
     const data = await gcal(userId, `/calendars/primary/events?${qs}`);

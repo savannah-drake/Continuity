@@ -24,7 +24,7 @@ export type Me = {
   medication: MedTimeline | null; // the one that runs out first
   medications: MedTimeline[];
   therapy: null | { nextSessionBy: string; bookBy: string; status: "green" | "yellow" | "red"; nextAction: string; sessionBooked: boolean };
-  appointments: { slot_id: number | null; visit_id?: number; slot_start: string; duration_min: number; telehealth: boolean;
+  appointments: { slot_id: null; visit_id?: number; slot_start: string; duration_min: number; telehealth: boolean;
     provider_name: string; provider_type: string; specialty: string | null; recurring?: boolean; imported?: boolean; source?: "continuity" | "care_team" }[];
   careTeam: CareMember[];
 };
@@ -72,5 +72,9 @@ export const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
 export const isoDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
-export const providersHref = (plan: string, type: string, before?: string | null) =>
-  `/providers?${new URLSearchParams({ plan, type, ...(before ? { before } : {}) })}`;
+// Where "Find a time" goes: the booking link of your own psychiatrist/therapist if you have one,
+// otherwise My care → Find someone new (directories pre-filtered by your plan)
+export function bookingHref(me: Me, role: "psychiatrist" | "therapist") {
+  const member = me.careTeam.find((c) => c.role === role && c.booking_url);
+  return member ? { href: member.booking_url!, external: true } : { href: "/care#find", external: false };
+}

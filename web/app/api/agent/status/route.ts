@@ -12,6 +12,9 @@ export async function GET(req: NextRequest) {
   const m = me.medication;
   const t = me.therapy;
   return Response.json({
+    // So "Tuesday at 4" can be turned into a date
+    today: new Date(`${me.today}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
+    today_iso: me.today,
     name: me.user.display_name,
     preferred_language: me.user.preferred_language || "en",
     insurance_plan: me.user.insurance_plan,
@@ -39,7 +42,7 @@ export async function GET(req: NextRequest) {
     upcoming_appointments: me.appointments.map((a: any) => ({
       provider: a.provider_name, type: a.provider_type, when: spokenWhen(a.slot_start), video: a.telehealth, repeats: !!a.recurring,
     })),
-    // The person's own providers. To book with them, they use the link or phone in the app (you can't book these yourself).
+    // The person's own providers. They book on that site or by phone; you can't book for them, but you can save a visit they booked (add_visit).
     care_team: me.careTeam.map((c) => ({
       who: c.provider_name || `their ${c.role}`, role: c.role,
       books_through: c.source_site === "zocdoc" ? "Zocdoc" : c.source_site === "grow" ? "Grow Therapy" : c.source_site === "psychologytoday" ? "Psychology Today" : c.source_site === "therapyden" ? "TherapyDen" : c.booking_url ? "a booking link" : c.phone ? "phone" : null,

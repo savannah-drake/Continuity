@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { LANGS, localeFor, type Lang } from "@/lib/copy";
-import { useMe, fmtShort, fmtSlot, providersHref } from "@/lib/useMe";
+import { useMe, fmtShort, fmtSlot, bookingHref } from "@/lib/useMe";
 import { Screen, BottomNav } from "@/components/ui";
 import { ArrowIcon } from "@/components/icons";
 
@@ -34,7 +34,6 @@ function Home() {
   if (state === "error" || !me) return <Screen><p className="text-muted">{COPY.onboarding.error}</p></Screen>;
 
   const name = me.user.display_name || "";
-  const plan = me.user.insurance_plan;
   const next = me.appointments[0];
   const todayLabel = new Date(`${me.today}T12:00:00`).toLocaleDateString(localeFor(lang), { weekday: "long", month: "long", day: "numeric" });
   const hasSteps = me.medications.length > 0 || !!me.therapy || !!next;
@@ -76,7 +75,7 @@ function Home() {
             <p className="text-[17px] font-bold text-navy">{days <= 0 ? H.bookNowTitle : H.timeToBookTitle}</p>
             <p className="mt-1 text-sm text-navy">{H.timeToBookBody(due.label, fmtShort(due.supplyEndDate), fmtShort(due.bookApptBy!), days)}</p>
             <div className="mt-3 flex items-center gap-5 text-sm font-semibold">
-              <Link href={providersHref(plan, "psychiatrist", due.apptBy)} className="rounded-full bg-navy px-4 py-2 text-white">{H.findTime}</Link>
+              <BookLink to={bookingHref(me, "psychiatrist")} className="rounded-full bg-navy px-4 py-2 text-white">{H.findTime}</BookLink>
               <Link href="/care" className="text-navy">{H.alreadyBooked}</Link>
             </div>
           </section>
@@ -96,11 +95,11 @@ function Home() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-navy">{H.daysLeft(m.label, m.daysLeft)}</p>
                   <p className={`text-sm ${m.status === "green" ? "text-muted" : "text-attn-text"}`}>
-                    {needsVisit ? H.bookBy(fmtShort(m.bookApptBy!)) : H.onTrack(fmtShort(m.supplyEndDate))}
+                    {needsVisit ? (m.bookApptBy! <= me.today ? H.bookNow(fmtShort(m.apptBy ?? m.supplyEndDate)) : H.bookBy(fmtShort(m.bookApptBy!))) : H.onTrack(fmtShort(m.supplyEndDate))}
                   </p>
                 </div>
                 {needsVisit && (
-                  <Link href={providersHref(plan, "psychiatrist", m.apptBy)} className="shrink-0 text-sm font-semibold text-brand">{H.findTime}</Link>
+                  <BookLink to={bookingHref(me, "psychiatrist")} className="shrink-0 text-sm font-semibold text-brand">{H.findTime}</BookLink>
                 )}
               </li>
             );
@@ -109,7 +108,7 @@ function Home() {
             <li className="flex items-center gap-3 px-4 py-3">
               <span className={`h-2 w-2 shrink-0 rounded-full ${dot(me.therapy.status)}`} aria-hidden />
               <p className="min-w-0 flex-1 font-semibold text-navy">{H.therapyDue(fmtShort(me.therapy.bookBy))}</p>
-              <Link href={providersHref(plan, "therapist", me.therapy.nextSessionBy)} className="shrink-0 text-sm font-semibold text-brand">{H.findTime}</Link>
+              <BookLink to={bookingHref(me, "therapist")} className="shrink-0 text-sm font-semibold text-brand">{H.findTime}</BookLink>
             </li>
           )}
           {next && (
@@ -152,12 +151,18 @@ function Home() {
 
       <div className="mt-8 flex justify-between text-sm font-semibold">
         <Link href="/help" className="text-navy">{H.support}</Link>
-        <Link href="/fund" className="text-brand">{COPY.fund.link}</Link>
       </div>
       <p className="mt-4 text-[11px] text-muted">{COPY.aiDisclosure}</p>
       <BottomNav active="home" />
     </Screen>
   );
+}
+
+// Opens your provider's own booking page in a new tab, or goes to My care → Find someone new
+function BookLink({ to, className, children }: { to: { href: string; external: boolean }; className: string; children: React.ReactNode }) {
+  return to.external
+    ? <a href={to.href} target="_blank" rel="noopener noreferrer" className={className}>{children}</a>
+    : <Link href={to.href} className={className}>{children}</Link>;
 }
 
 function Welcome() {
@@ -188,8 +193,6 @@ function Welcome() {
           <a href="/api/auth/google" className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-line bg-white text-[15px] font-bold text-navy hover:bg-mist/40">
             <GoogleMark /> {A.google}
           </a>
-          <a href="/api/auth/demo" className="block text-center text-sm font-semibold text-brand">{A.demo}</a>
-          <p className="text-center text-[11px] text-muted">{A.demoNote}</p>
         </div>
       </div>
     </Screen>

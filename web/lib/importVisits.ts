@@ -133,3 +133,65 @@ AND NOT (google_source_event_id = ANY($3::text[]))`, [userId, to.toISOString(), 
 
   return { imported, checked: events.length, matched: seen.length };
 }
+
+
+// "Appointment with Antionette Holt": Gmail turns booking emails into events like this, with no hint of what kind of
+// visit it is. We don't guess. Instead My care asks "Is this a visit?" and the user picks therapist / psychiatrist / not a visit.
+// Nothing is stored until they answer; "Not a visit" stores only the event id so we don't ask again.
+const WITH_NAME = /^\s*(?:appointment|appt|session|visit|consultation|consult|meeting|cita|sesi[oó]n|consulta)\s+(?:with|con)\s+(.{3,60}?)\s*$/i;
+
+export type Suggestion = { eventId: string; name: string; startsAt: string; durationMin: number };
+
+export async function visitSuggestions(userId: number): Promise<Suggestion[]> {
+  const [u] = await query<{ auto_import_visits: boolean }>(
+`SELECT u.auto_import_visits
+FROM users u
+WHERE u.user_id = $1`, [userId]).catch(() => []);
+  if (!u?.auto_import_visits) return [];
+  const events = await listEvents(userId, new Date(Date.now() - DAY), new Date(Date.now() + 90 * DAY));
+  if (!events) return [];
+  const team = await query<Member>(
+`SELECT c.member_id, c.provider_name, c.source_site, c.role, c.video
+FROM care_team c
+WHERE c.user_id = $1`, [userId]);
+  const skip = new Set((await query<{ id: string }>(
+`SELECT d.google_event_id AS id
+FROM import_dismissed d
+WHERE d.user_id = $1
+UNION
+SELECT v.google_source_event_id
+FROM visits v
+WHERE v.user_id = $1
+AND v.google_source_event_id IS NOT NULL`, [userId])).map((r) => r.id));
+
+  const out = new Map<string, Suggestion>();
+  for (const e of events) {
+    const key = e.recurringEventId || e.id;
+    if (out.has(key) || skip.has(key) || e.status === "cancelled" || !e.start?.dateTime || !e.end?.dateTime) continue;
+    if (e.source?.title === "Continuity" || matchEvent(e, team)) continue; // already handled by importVisits
+    const name = e.summary?.match(WITH_NAME)?.[1]?.replace(/[.,;:]+$/, "");
+    if (!name) continue;
+    const start = new Date(e.start.dateTime);
+    out.set(key, { eventId: key, name, startsAt: start.toISOString(), durationMin: Math.max(10, Math.round((new Date(e.end.dateTime).getTime() - start.getTime()) / 60000)) });
+  }
+  return [...out.values()].slice(0, 5);
+}
+
+// The user answered. A role adds the person to the care team by the name in the event; importVisits then matches
+// this event (and every later one with them) by name.
+export async function answerSuggestion(userId: number, eventId: string, role: "therapist" | "psychiatrist" | null) {
+  if (!role) {
+    await query(
+`INSERT INTO import_dismissed (user_id, google_event_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING`, [userId, eventId]);
+    return { ok: true, imported: 0 };
+  }
+  const s = (await visitSuggestions(userId)).find((x) => x.eventId === eventId);
+  if (!s) return { ok: false, imported: 0 };
+  await query(
+`INSERT INTO care_team (user_id, provider_name, role, video)
+VALUES ($1, $2, $3, false)`, [userId, s.name, role]);
+  const r = await importVisits(userId);
+  return { ok: true, imported: r.imported };
+}

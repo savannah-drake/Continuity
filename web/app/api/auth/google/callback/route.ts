@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     // Already signed in (e.g. connecting the calendar from Profile)? Link Google to that account,
     // except the shared demo account: nobody's real Google account should get attached to it.
     const signedIn = readSessionValue(req.cookies.get(SESSION_COOKIE)?.value);
-    const current = signedIn && signedIn !== Number(process.env.DEMO_USER_ID) ? signedIn : null;
+    const current = signedIn || null;
     let userId: number;
     let isNew = false;
     const [byGoogle] = await query<{ user_id: number }>(
