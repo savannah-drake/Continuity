@@ -13,12 +13,18 @@ const SITE_PATTERNS: [string, RegExp][] = [
   ["therapyden", /therapy ?den|therapyden\.com/i],
   ["timelycare", /timely ?care|timelycare\.com/i],
 ];
+// Ordinary appointment titles people type themselves ("Therapy", "Psychiatrist", "Session with Dr. Lee")
+const CARE_WORDS = /\b(therapy|therapist|counsel(l)?ing|counselor|psychiatr\w*|psychotherap\w*|psycholog\w*|med(ication)? (check|management)|lcsw|lpc)\b/i;
+const CARE_WORDS_OTHER = /(terapia|terapeuta|psiquiatr|psic[oó]log|consejer|治疗|心理|精神科|咨询)/i; // Spanish, Chinese
 const WEEK = 7 * 24 * 3600 * 1000;
 const DAY = 24 * 3600 * 1000;
 
 type Member = { member_id: number; provider_name: string | null; source_site: string | null; role: string; video: boolean };
 
 const text = (e: CalEvent) => [e.summary, e.description, e.location, e.organizer?.email].filter(Boolean).join(" \n ");
+
+const guessRole = (e: CalEvent) => (/psychiatr|psiquiatr|精神科|medication management|med management|med check/i.test(text(e)) ? "psychiatrist" : "therapist");
+const guessVideo = (e: CalEvent) => /video|telehealth|virtual|zoom|google meet|doxy/i.test(text(e));
 
 function matchEvent(e: CalEvent, team: Member[]) {
   const t = text(e);
@@ -27,14 +33,20 @@ function matchEvent(e: CalEvent, team: Member[]) {
     && t.toLowerCase().includes(m.provider_name.replace(/^dr\.?\s+/i, "").toLowerCase()));
   if (byName) return { member: byName, site: byName.source_site };
   const site = SITE_PATTERNS.find(([, re]) => re.test(t))?.[0] ?? null;
-  if (!site) return null;
-  // Someone on the team booked through that site
-  const bySite = team.filter((m) => m.source_site === site);
-  return { member: bySite.length === 1 ? bySite[0] : null, site };
+  if (site) {
+    // Someone on the team booked through that site
+    const bySite = team.filter((m) => m.source_site === site);
+    return { member: bySite.length === 1 ? bySite[0] : null, site };
+  }
+  // A plain "Therapy" / "Psychiatrist" event (title only, so a meeting that just mentions therapy in its notes isn't picked up)
+  if (e.summary && (CARE_WORDS.test(e.summary) || CARE_WORDS_OTHER.test(e.summary))) {
+    const role = guessRole(e);
+    const byRole = team.filter((m) => m.role === role);
+    return { member: byRole.length === 1 ? byRole[0] : null, site: null };
+  }
+  return null;
 }
 
-const guessRole = (e: CalEvent) => (/psychiatr|medication management|med management|psychiatric/i.test(text(e)) ? "psychiatrist" : "therapist");
-const guessVideo = (e: CalEvent) => /video|telehealth|virtual|zoom|google meet|doxy/i.test(text(e));
 
 export async function importVisits(userId: number) {
   const [u] = await query<{ auto_import_visits: boolean }>(
@@ -119,5 +131,5 @@ AND starts_at > now()
 AND starts_at < $2
 AND NOT (google_source_event_id = ANY($3::text[]))`, [userId, to.toISOString(), seen]);
 
-  return { imported };
+  return { imported, checked: events.length, matched: seen.length };
 }

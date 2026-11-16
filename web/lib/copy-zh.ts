@@ -93,8 +93,10 @@ export const COPY_ZH: typeof COPY = {
     connectedNote: "Google 日历已连接。",
     declinedNote: "没有获得日历权限，所以没有连接。",
     importTitle: "从预约确认中添加预约",
-    importExplain: "当 Zocdoc、Grow Therapy、Psychology Today、TherapyDen 或 TimelyCare 把预约放到你的日历上时，Continuity 会把它添加到这里。我们只查看提到这些网站或你照护团队成员的活动，只保存时间和对象，从不保存活动标题或备注。",
+    importExplain: "Continuity 会从你的日历中添加心理治疗和精神科预约：标题像“Therapy”或“Psychiatrist”的活动，或提到 Zocdoc、Grow Therapy、Psychology Today、TherapyDen、TimelyCare 或你照护团队成员的活动，只保存时间和对象，从不保存活动标题或备注。",
     importFound: (n: number) => (n ? `在你的日历上找到 ${n} 个预约。` : "还没有找到预约确认，我们会继续查看。"),
+    importChecked: (checked: number, matched: number) => `查看了 ${checked} 个即将到来的活动，其中 ${matched} 个看起来是预约，已放在“我的照护”里。`,
+    checkNow: "立即查看我的日历",
   },
 
   welcome: {
@@ -216,6 +218,11 @@ export const COPY_ZH: typeof COPY = {
     therapyDue: (d: string) => `心理治疗 · 请在 ${d} 前预约`,
     noneYet: "目前没有待办事项。可以在“我的照护”里添加药物或为你看诊的人。",
     support: "立即寻求支持",
+    timeToBookTitle: "该预约精神科看诊了",
+    bookNowTitle: "请今天就预约精神科看诊",
+    timeToBookBody: (med: string, runsOut: string, bookBy: string, days: number) =>
+      `你的 ${med} 将在 ${runsOut} 用完，续药前医生需要先见你。${days <= 0 ? `最好在 ${bookBy} 前预约，所以请今天就预约。` : `请在 ${bookBy} 前预约（还有 ${days} 天）。`}`,
+    alreadyBooked: "我已经预约了",
   },
 
   fund: {

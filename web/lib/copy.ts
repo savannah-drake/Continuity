@@ -113,8 +113,10 @@ export const COPY = {
     connectedNote: "Google Calendar connected.",
     declinedNote: "Calendar access wasn't granted, so nothing was connected.",
     importTitle: "Add visits from booking confirmations",
-    importExplain: "When Zocdoc, Grow Therapy, Psychology Today, TherapyDen or TimelyCare puts a visit on your calendar, Continuity adds it here. We only look at events that mention those sites or someone on your care team, and we save just the time and who it's with, never the event's title or notes.",
+    importExplain: "Continuity adds therapy and psychiatry visits from your calendar: events titled like “Therapy” or “Psychiatrist”, or that mention Zocdoc, Grow Therapy, Psychology Today, TherapyDen, TimelyCare or someone on your care team, and we save just the time and who it's with, never the event's title or notes.",
     importFound: (n: number) => (n ? `Found ${n} ${n === 1 ? "visit" : "visits"} on your calendar.` : "No booking confirmations found yet. We'll keep checking."),
+    importChecked: (checked: number, matched: number) => `Checked ${checked} upcoming events: ${matched} ${matched === 1 ? "looks like a visit" : "look like visits"}. They're in My care.`,
+    checkNow: "Check my calendar now",
   },
 
   welcome: {
@@ -236,6 +238,11 @@ export const COPY = {
     therapyDue: (d: string) => `Therapy · book by ${d}`,
     noneYet: "Nothing due. Add a medication or the people you see in My care.",
     support: "Get support now",
+    timeToBookTitle: "Time to book your psychiatry visit",
+    bookNowTitle: "Book your psychiatry visit today",
+    timeToBookBody: (med: string, runsOut: string, bookBy: string, days: number) =>
+      `Your ${med} runs out ${runsOut}, and your prescriber needs to see you before renewing it. ${days <= 0 ? "The best time to book was " + bookBy + ", so book today." : `Book by ${bookBy} (${days} ${days === 1 ? "day" : "days"} from now).`}`,
+    alreadyBooked: "I already booked",
   },
 
   fund: {
@@ -521,8 +528,10 @@ export const COPY_ES: typeof COPY = {
     connectedNote: "Google Calendar conectado.",
     declinedNote: "No se dio acceso al calendario, así que no se conectó nada.",
     importTitle: "Agregar citas de las confirmaciones de reserva",
-    importExplain: "Cuando Zocdoc, Grow Therapy, Psychology Today, TherapyDen o TimelyCare ponen una cita en tu calendario, Continuity la agrega aquí. Solo revisamos eventos que mencionan esos sitios o a alguien de tu equipo de atención, y guardamos solo la hora y con quién es, nunca el título ni las notas del evento.",
+    importExplain: "Continuity agrega citas de terapia y psiquiatría de tu calendario: eventos con títulos como “Terapia” o “Psiquiatra”, o que mencionan Zocdoc, Grow Therapy, Psychology Today, TherapyDen, TimelyCare o a alguien de tu equipo de atención, y guardamos solo la hora y con quién es, nunca el título ni las notas del evento.",
     importFound: (n: number) => (n ? `Encontramos ${n} ${n === 1 ? "cita" : "citas"} en tu calendario.` : "Aún no encontramos confirmaciones. Seguiremos revisando."),
+    importChecked: (checked: number, matched: number) => `Revisamos ${checked} eventos próximos: ${matched} ${matched === 1 ? "parece una cita" : "parecen citas"}. Están en Mi atención.`,
+    checkNow: "Revisar mi calendario ahora",
   },
 
   welcome: {
@@ -644,6 +653,11 @@ export const COPY_ES: typeof COPY = {
     therapyDue: (d: string) => `Terapia · agenda antes del ${d}`,
     noneYet: "No hay nada pendiente. Agrega un medicamento o a quienes te atienden en Mi atención.",
     support: "Busca apoyo ahora",
+    timeToBookTitle: "Es hora de agendar tu cita de psiquiatría",
+    bookNowTitle: "Agenda tu cita de psiquiatría hoy",
+    timeToBookBody: (med: string, runsOut: string, bookBy: string, days: number) =>
+      `Tu ${med} se acaba el ${runsOut}, y tu médico necesita verte antes de renovarlo. ${days <= 0 ? "Lo ideal era agendar antes del " + bookBy + ", así que agenda hoy." : `Agenda antes del ${bookBy} (en ${days} ${days === 1 ? "día" : "días"}).`}`,
+    alreadyBooked: "Ya agendé",
   },
 
   fund: {

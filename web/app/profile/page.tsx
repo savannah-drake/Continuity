@@ -97,7 +97,7 @@ function ProfilePage() {
     }).catch(() => null);
     if (!res?.ok) { setAutoImport(!on); return; }
     const d = await res.json().catch(() => ({}));
-    if (on) setImportNote(S.importFound(d.imported ?? 0));
+    if (on) setImportNote(d.skipped === "not_connected" ? S.reconnect : d.skipped === "error" ? C.care.error : S.importChecked(d.checked ?? 0, d.matched ?? 0));
   }
 
   async function disconnectGoogle() {
@@ -186,6 +186,7 @@ function ProfilePage() {
                 <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#5AA9D8]" checked={autoImport} onChange={(e) => toggleAutoImport(e.target.checked)} />
                 <span><span className="font-semibold">{S.importTitle}</span><br /><span className="text-muted">{S.importExplain}</span></span>
               </label>
+              {autoImport && <button type="button" onClick={() => toggleAutoImport(true)} className="mt-2 text-sm font-semibold text-brand">{S.checkNow}</button>}
               {importNote && <p className="mt-2 text-sm text-muted">{importNote}</p>}
             </>
           ) : (

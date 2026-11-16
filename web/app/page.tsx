@@ -10,6 +10,9 @@ import { useMe, fmtShort, fmtSlot, providersHref } from "@/lib/useMe";
 import { Screen, BottomNav } from "@/components/ui";
 import { ArrowIcon } from "@/components/icons";
 
+const diffFromToday = (today: string, d: string) =>
+  Math.round((new Date(`${d}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86_400_000);
+
 const dot = (status: string) => (status === "red" ? "bg-coral" : status === "yellow" ? "bg-attn" : "bg-live");
 
 export default function HomePage() {
@@ -62,6 +65,23 @@ function Home() {
         <ArrowIcon size={20} />
       </Link>
       <div className="mb-6" />
+
+      {/* Time to book: a renewal visit is due soon for a medication */}
+      {(() => {
+        const due = me.medications.find((m) => m.bookApptBy && !m.visitBooked && diffFromToday(me.today, m.bookApptBy) <= 14);
+        if (!due) return null;
+        const days = diffFromToday(me.today, due.bookApptBy!);
+        return (
+          <section className={`mb-6 rounded-2xl px-4 py-4 ${days <= 2 ? "bg-coral/15" : "bg-attn-tint"}`}>
+            <p className="text-[17px] font-bold text-navy">{days <= 0 ? H.bookNowTitle : H.timeToBookTitle}</p>
+            <p className="mt-1 text-sm text-navy">{H.timeToBookBody(due.label, fmtShort(due.supplyEndDate), fmtShort(due.bookApptBy!), days)}</p>
+            <div className="mt-3 flex items-center gap-5 text-sm font-semibold">
+              <Link href={providersHref(plan, "psychiatrist", due.apptBy)} className="rounded-full bg-navy px-4 py-2 text-white">{H.findTime}</Link>
+              <Link href="/care" className="text-navy">{H.alreadyBooked}</Link>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* What's next, in one list */}
       <h2 className="mb-2 text-[15px] font-bold text-navy">{H.nextSteps}</h2>

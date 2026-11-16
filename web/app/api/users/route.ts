@@ -130,9 +130,10 @@ RETURNING user_id`, vals);
   if (!r.rowCount) return Response.json({ error: "not_found" }, { status: 404 });
   if (b.autoImportVisits === true) {
     // Look right away instead of waiting for the next calendar refresh
-    const found = await importVisits(userId).catch((e) => { console.error("visit import failed", e); return { imported: 0 }; });
+    const found: { imported: number; checked?: number; matched?: number; skipped?: string } =
+      await importVisits(userId).catch((e) => { console.error("visit import failed", e); return { imported: 0, skipped: "error" }; });
     if (found.imported) await syncMedReminders(userId).catch(() => {});
-    return Response.json({ ok: true, imported: found.imported });
+    return Response.json({ ok: true, ...found });
   }
   return Response.json({ ok: true });
 }
