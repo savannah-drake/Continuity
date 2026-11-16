@@ -1,7 +1,7 @@
 // app/timeline/page.tsx: the care chain, from Ivy's "Refill timeline / When to schedule" mockup.
 "use client";
 import { useCopy } from "@/lib/i18n";
-import { useMe, fmtDay, isoDay, fmtTime, bookingHref } from "@/lib/useMe";
+import { useMe, visitLine, fmtDay, isoDay, fmtTime, bookingHref } from "@/lib/useMe";
 import { Screen, ButtonLink, BottomNav, TimelineTabs } from "@/components/ui";
 
 type Dot = "today" | "confirmed" | "action" | "end" | "later";
@@ -52,7 +52,7 @@ export default function TimelinePage() {
       {nextAction && (
         <div className="mb-6 border-l-2 border-attn pl-3">
           <p className="text-sm text-muted">{T.nextStep}</p>
-          <p className="font-bold text-navy">{nextAction.bookApptBy! <= me.today ? COPY.home.bookNow(fmtDay(nextAction.apptBy ?? nextAction.supplyEndDate)) : COPY.home.bookBy(fmtDay(nextAction.bookApptBy!))}</p>
+          <p className="font-bold text-navy">{visitLine(nextAction, me.today, COPY.home, fmtDay)}</p>
           <p className="text-sm text-muted">{nextAction.renewalReason ? COPY.renewalReasons[nextAction.renewalReason] : T.bookByBody(nextAction.label)}</p>
         </div>
       )}

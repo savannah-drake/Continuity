@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCopy } from "@/lib/i18n";
-import { useMe, fmtShort, fmtSlot, type MedTimeline, type CareMember } from "@/lib/useMe";
+import { useMe, visitLine, fmtShort, fmtSlot, type MedTimeline, type CareMember } from "@/lib/useMe";
 import { SuggestInput } from "@/components/Suggest";
 import { Screen, Field, inputClass, BottomNav } from "@/components/ui";
 import { ExternalIcon, PhoneIcon, PlusIcon } from "@/components/icons";
@@ -131,7 +131,7 @@ export default function CarePage() {
                   <p className="font-semibold text-navy">{m.label}</p>
                   <p className="text-sm text-muted">
                     {K.daysLeftShort(m.daysLeft)} · {K.runsOut(fmtShort(m.supplyEndDate))}
-                    {m.bookApptBy && !m.visitBooked ? ` · ${m.bookApptBy <= me.today ? K.bookNow(fmtShort(m.apptBy ?? m.supplyEndDate)) : K.bookBy(fmtShort(m.bookApptBy))}` : ""}
+                    {m.bookApptBy && !m.visitBooked ? ` · ${visitLine(m, me.today, K, fmtShort)}` : ""}
                   </p>
                   {m.reminderTime && <p className="text-xs text-muted">{K.reminderAt(m.reminderTime)}</p>}
                 </div>
@@ -281,7 +281,6 @@ function MedEditor({ draft, busy, onSave, onCancel }: { draft: MedDraft; busy: b
         <input type="checkbox" className="h-4 w-4 accent-[#5AA9D8]" checked={d.needsVisit} onChange={(e) => setD({ ...d, needsVisit: e.target.checked })} />
         {K.medNeedsVisit}
       </label>
-      {d.needsVisit && <Field label={K.medLead}><input className={inputClass} type="number" min={1} value={d.lead} onChange={(e) => setD({ ...d, lead: Number(e.target.value) })} /></Field>}
       <Field label={K.medReminder} help={K.medReminderHelp}><input className={inputClass} type="time" value={d.reminder} onChange={(e) => setD({ ...d, reminder: e.target.value })} /></Field>
       <Buttons busy={busy} onCancel={onCancel} />
     </form>

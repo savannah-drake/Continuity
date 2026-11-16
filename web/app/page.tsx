@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { LANGS, localeFor, type Lang } from "@/lib/copy";
-import { useMe, fmtShort, fmtSlot, bookingHref } from "@/lib/useMe";
+import { useMe, visitLine, fmtShort, fmtSlot, bookingHref } from "@/lib/useMe";
 import { Screen, BottomNav } from "@/components/ui";
 import { ArrowIcon } from "@/components/icons";
 
@@ -73,7 +73,7 @@ function Home() {
         return (
           <section className={`mb-6 rounded-2xl px-4 py-4 ${days <= 2 ? "bg-coral/15" : "bg-attn-tint"}`}>
             <p className="text-[17px] font-bold text-navy">{days <= 0 ? H.bookNowTitle : H.timeToBookTitle}</p>
-            <p className="mt-1 text-sm text-navy">{H.timeToBookBody(due.label, fmtShort(due.supplyEndDate), fmtShort(due.bookApptBy!), days)}</p>
+            <p className="mt-1 text-sm text-navy">{H.timeToBookBody(due.label, fmtShort(due.supplyEndDate), fmtShort(due.apptBy ?? due.supplyEndDate), days)}</p>
             <div className="mt-3 flex items-center gap-5 text-sm font-semibold">
               <BookLink to={bookingHref(me, "psychiatrist")} className="rounded-full bg-navy px-4 py-2 text-white">{H.findTime}</BookLink>
               <Link href="/care" className="text-navy">{H.alreadyBooked}</Link>
@@ -95,7 +95,7 @@ function Home() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-navy">{H.daysLeft(m.label, m.daysLeft)}</p>
                   <p className={`text-sm ${m.status === "green" ? "text-muted" : "text-attn-text"}`}>
-                    {needsVisit ? (m.bookApptBy! <= me.today ? H.bookNow(fmtShort(m.apptBy ?? m.supplyEndDate)) : H.bookBy(fmtShort(m.bookApptBy!))) : H.onTrack(fmtShort(m.supplyEndDate))}
+                    {needsVisit ? visitLine(m, me.today, H, fmtShort) : H.onTrack(fmtShort(m.supplyEndDate))}
                   </p>
                 </div>
                 {needsVisit && (

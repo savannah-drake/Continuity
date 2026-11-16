@@ -72,6 +72,14 @@ export const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
 export const isoDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
+// The visit window for a medication that needs a visit: between today and the visit deadline, "by X, book now" once
+// it's within two weeks, or "you're out" once the supply has run out.
+export function visitLine(m: MedTimeline, today: string, X: { bookBy: (d: string) => string; bookNow: (d: string) => string; ranOut: string }, fmt: (d: string) => string) {
+  if (m.supplyEndDate <= today) return X.ranOut;
+  const visitBy = m.apptBy ?? m.supplyEndDate;
+  return m.bookApptBy && m.bookApptBy <= today ? X.bookNow(fmt(visitBy)) : X.bookBy(fmt(visitBy));
+}
+
 // Where "Find a time" goes: the booking link of your own psychiatrist/therapist if you have one,
 // otherwise My care → Find someone new (directories pre-filtered by your plan)
 export function bookingHref(me: Me, role: "psychiatrist" | "therapist") {

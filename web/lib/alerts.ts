@@ -1,7 +1,8 @@
 // lib/alerts.ts: decide which refill/booking alerts are due and send each one once.
-//   added      right after a medication is added or changed: the plan in one line
-//   book_14/7/3/1  that many days before the book-by date
-//   book_now   every day once it's time to book, until a psychiatry visit is in Continuity
+//   added      right after a medication is added or changed: the visit window in one line
+//   visit_21/14/10  that many days left to see the psychiatrist (a good time to book)
+//   book_now   every day in the last week before the visit deadline, until a psychiatry visit is in Continuity
+//   out        every day once the supply has run out, until a visit is in
 //   refill     a week before the refill is due (no visit needed)
 // Runs daily from Vercel Cron (/api/cron/alerts) and right after a medication is saved.
 import { query } from "./db";
@@ -33,14 +34,19 @@ WHERE u.user_id = $1`, [userId]);
     const due: { key: string; a: Alert }[] = [];
     const runsOut = day(m.supplyEndDate);
     if (m.bookApptBy && !m.visitBooked) {
-      const days = diffDays(me.today, m.bookApptBy);
-      const visitBy = day(m.apptBy ?? m.supplyEndDate);
+      const visitBy = m.apptBy ?? m.supplyEndDate;
+      const v = diffDays(me.today, visitBy); // days left to see the psychiatrist
+      const out = m.supplyEndDate <= me.today;
       if (opts.justSaved === m.medicationId) {
-        due.push({ key: `added:${m.bookApptBy}`, a: { title: A.planTitle(m.label), body: days <= 0 ? A.planBookNow(runsOut, visitBy) : A.planBook(runsOut, day(m.bookApptBy)), url: "/care" } });
-      } else if (days <= 0) {
-        due.push({ key: `book_now:${me.today}`, a: { title: A.nowTitle(m.label), body: A.nowBody(runsOut, visitBy), url: "/call" } });
-      } else if ([14, 7, 3, 1].includes(days)) {
-        due.push({ key: `book_${days}:${m.bookApptBy}`, a: { title: A.soonTitle(m.label, days), body: A.soonBody(day(m.bookApptBy), runsOut), url: "/care" } });
+        due.push({ key: `added:${visitBy}`, a: out
+          ? { title: A.outTitle(m.label), body: A.outBody, url: "/call" }
+          : { title: A.planTitle(m.label), body: m.bookApptBy <= me.today ? A.planBookNow(runsOut, day(visitBy)) : A.planBook(runsOut, day(visitBy)), url: "/care" } });
+      } else if (out) {
+        due.push({ key: `out:${me.today}`, a: { title: A.outTitle(m.label), body: A.outBody, url: "/call" } });
+      } else if (v <= 7) {
+        due.push({ key: `book_now:${me.today}`, a: { title: A.nowTitle(m.label), body: A.nowBody(runsOut, day(visitBy)), url: "/call" } });
+      } else if ([21, 14, 10].includes(v)) {
+        due.push({ key: `visit_${v}:${visitBy}`, a: { title: A.soonTitle(m.label, v), body: A.soonBody(day(visitBy), runsOut), url: "/care" } });
       }
     } else if (!m.bookApptBy && m.rxNeededBy) {
       const days = diffDays(me.today, m.rxNeededBy);

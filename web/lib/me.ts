@@ -92,7 +92,7 @@ AND v.status = 'scheduled'`,
     const t = computeTimeline(
       { daysSupplyRemaining: m.days_supply_remaining, supplyAsOf: m.supply_as_of, refillsRemaining: m.refills_remaining,
         rxExpiresOn: m.rx_expires_on, requiresAppointmentForRenewal: m.requires_appointment_for_renewal,
-        bookingLeadDays: m.booking_lead_days ?? 14 },
+        bookingLeadDays: 14 }, // aim to book about two weeks before the visit deadline
       today,
     );
     // Never show a date that already passed. If the ideal book-by date is gone, it's "book now"; if the ideal visit
