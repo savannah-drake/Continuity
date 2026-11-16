@@ -3,6 +3,7 @@
 // and "Why blockchain?". No card numbers, ever. Demo runs on Solana devnet: no real money moves.
 "use client";
 import { useEffect, useState } from "react";
+import { localeFor } from "@/lib/copy";
 import { useCopy, useLang } from "@/lib/i18n";
 import { Screen, Card, Eyebrow, Notice, BottomNav } from "@/components/ui";
 
@@ -27,7 +28,7 @@ export default function FundPage() {
   }, []);
 
   const amount = custom ? Math.max(1, Math.min(500, Number(custom) || 0)) : usd;
-  const day = (iso: string) => new Date(iso).toLocaleDateString(lang === "es" ? "es-US" : "en-US", { month: "short", day: "numeric" });
+  const day = (iso: string) => new Date(iso).toLocaleDateString(localeFor(lang), { month: "short", day: "numeric" });
 
   return (
     <Screen nav>

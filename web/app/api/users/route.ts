@@ -2,6 +2,7 @@
 // POST /api/users: saves onboarding for the signed-in user (profile + optional medication) and returns the timeline.
 // PATCH /api/users: Profile edits for the signed-in user.
 import { pool } from "@/lib/db";
+import { isLang } from "@/lib/copy";
 import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 import { upsertMedication, syncMedReminders, cleanMed } from "@/lib/medications";
 import { computeTimeline, computeTherapyTimeline } from "@/lib/engine";
@@ -13,7 +14,7 @@ type Body = {
   phone?: string;
   insurancePlan: string;
   careType: "psychiatry" | "therapy" | "both";
-  preferredLanguage?: "en" | "es";
+  preferredLanguage?: "en" | "es" | "zh";
   homeZip?: string;
   homeLat?: number;
   homeLng?: number;
@@ -113,7 +114,7 @@ export async function PATCH(req: Request) {
   const add = (col: string, v: unknown) => { vals.push(v); sets.push(`${col} = $${vals.length}`); };
   if (typeof b.displayName === "string" && b.displayName.trim()) add("display_name", b.displayName.trim().slice(0, 60));
   if (typeof b.insurancePlan === "string" && b.insurancePlan.trim()) add("insurance_plan", b.insurancePlan.trim().slice(0, 80));
-  if (b.preferredLanguage === "en" || b.preferredLanguage === "es") add("preferred_language", b.preferredLanguage);
+  if (isLang(b.preferredLanguage)) add("preferred_language", b.preferredLanguage);
   if (typeof b.homeZip === "string" && /^\d{5}$/.test(b.homeZip)) {
     const c = await zipToCoords(b.homeZip);
     if (!c) return Response.json({ error: "zip_not_found" }, { status: 400 });

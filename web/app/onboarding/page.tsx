@@ -93,7 +93,7 @@ export default function Onboarding() {
           homeZip: zip || undefined,
           homeLat: coords?.lat, homeLng: coords?.lng,
           medication: showMed ? {
-            label: medLabel || (lang === "es" ? "Tu medicamento" : "Your medication"), daysSupplyRemaining: daysLeft,
+            label: medLabel || (lang === "es" ? "Tu medicamento" : lang === "zh" ? "你的药物" : "Your medication"), daysSupplyRemaining: daysLeft,
             refillsRemaining: refills, rxExpiresOn: expires || null,
             requiresAppointmentForRenewal: needsAppt, bookingLeadDays: lead, reminderTime: reminderTime || null,
           } : undefined,
@@ -127,7 +127,7 @@ export default function Onboarding() {
           <div className="space-y-4">
             <Field label={C.language}>
               <div className="flex rounded-full bg-mist p-1">
-                {(["en", "es"] as const).map((l) => (
+                {(["en", "es", "zh"] as const).map((l) => (
                   <button type="button" key={l} onClick={() => setLang(l)}
                     className={`flex-1 rounded-full py-2 text-sm font-bold ${lang === l ? "bg-brand text-white" : "text-navy"}`}>
                     {C.languages[l]}

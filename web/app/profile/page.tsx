@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMe, signOut as endSession } from "@/lib/useMe";
+import { localeFor } from "@/lib/copy";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { PLANS } from "@/lib/copy";
 import { Screen, Button, ButtonLink, Field, BottomNav, inputClass } from "@/components/ui";
@@ -137,10 +138,10 @@ function ProfilePage() {
         </Field>
         <Field label={P.language}>
           <div className="flex gap-2">
-            {(["en", "es"] as const).map((l) => (
+            {(["en", "es", "zh"] as const).map((l) => (
               <button key={l} type="button" onClick={() => { setLang(l); setStatus("idle"); }}
                 className={`flex-1 rounded-full border-2 py-2 text-sm font-bold ${lang === l ? "border-brand bg-brand text-white" : "border-line text-navy"}`}>
-                {l === "en" ? "English" : "Español"}
+                {l === "en" ? "English" : l === "es" ? "Español" : "中文"}
               </button>
             ))}
           </div>
@@ -161,7 +162,7 @@ function ProfilePage() {
             <>
               <p className="font-semibold text-navy">{cal.google.needsReconnect ? S.reconnect : S.connected}</p>
               {cal.google.lastSynced && !cal.google.needsReconnect && (
-                <p className="text-sm text-muted">{S.lastSynced(new Date(cal.google.lastSynced).toLocaleString(lang === "es" ? "es-US" : "en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }))}</p>
+                <p className="text-sm text-muted">{S.lastSynced(new Date(cal.google.lastSynced).toLocaleString(localeFor(lang), { hour: "numeric", minute: "2-digit", month: "short", day: "numeric" }))}</p>
               )}
               <div className="mt-2 flex gap-5 text-sm font-semibold">
                 {cal.google.needsReconnect && <a href="/api/auth/google?calendar=1&next=/profile" className="text-brand">{S.connect}</a>}

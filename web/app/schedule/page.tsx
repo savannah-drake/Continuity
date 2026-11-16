@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMe, getUserId } from "@/lib/useMe";
+import { localeFor } from "@/lib/copy";
 import { useCopy, useLang } from "@/lib/i18n";
 import { Screen, BottomNav, Notice, ButtonLink, TimelineTabs } from "@/components/ui";
 
@@ -23,7 +24,7 @@ export default function SchedulePage() {
   const C = useCopy();
   const S = C.schedule;
   const lang = useLang();
-  const locale = lang === "es" ? "es-US" : "en-US";
+  const locale = localeFor(lang);
   const { me, state } = useMe();
   const userId = typeof window !== "undefined" ? getUserId() : null;
   const [busy, setBusy] = useState<Block[] | null>(null);

@@ -37,7 +37,8 @@ export default function HelpPage() {
         <a href={lang === "es" ? smsHref("988", "AYUDA") : smsHref("988")}
           className="flex-1 rounded-full border-2 border-navy py-3 text-center text-[15px] font-bold text-navy">{H.text988}</a>
       </div>
-      <p className="mb-5 text-center text-sm font-bold text-coral"><a href="tel:911">{H.emergency}</a></p>
+      <p className="mb-2 text-center text-sm font-bold text-coral"><a href="tel:911">{H.emergency}</a></p>
+      <p className="mb-5 text-center text-xs text-muted">{H.interpreter}</p>
 
       <label className="mb-1 block text-sm font-bold text-navy" htmlFor="need">{H.ask}</label>
       <textarea id="need" rows={2} value={input} onChange={(e) => setInput(e.target.value)} placeholder={H.askPlaceholder}

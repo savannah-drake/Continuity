@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
+import { LANGS, localeFor, type Lang } from "@/lib/copy";
 import { useMe, fmtShort, fmtSlot, providersHref } from "@/lib/useMe";
 import { Screen, BottomNav } from "@/components/ui";
 import { ArrowIcon } from "@/components/icons";
@@ -35,7 +36,7 @@ function Home() {
   const name = me.user.display_name || "";
   const plan = me.user.insurance_plan;
   const next = me.appointments[0];
-  const todayLabel = new Date(`${me.today}T12:00:00`).toLocaleDateString(lang === "es" ? "es-US" : "en-US", { weekday: "long", month: "long", day: "numeric" });
+  const todayLabel = new Date(`${me.today}T12:00:00`).toLocaleDateString(localeFor(lang), { weekday: "long", month: "long", day: "numeric" });
   const hasSteps = me.medications.length > 0 || !!me.therapy || !!next;
 
   return (
@@ -45,9 +46,10 @@ function Home() {
           <h1 className="text-[26px] font-bold leading-tight text-navy">{name ? H.hi(name) : COPY.appName}</h1>
           <p className="mt-0.5 text-sm text-muted">{todayLabel}</p>
         </div>
-        <button onClick={() => setLang(lang === "en" ? "es" : "en")} className="mt-1 text-sm font-semibold text-brand">
-          {lang === "en" ? "Español" : "English"}
-        </button>
+        <select aria-label={COPY.profile.language} value={lang} onChange={(e) => setLang(e.target.value as Lang)}
+          className="mt-1 rounded-full border border-line bg-white px-3 py-1 text-sm font-semibold text-navy">
+          {LANGS.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+        </select>
       </header>
 
       {/* Voice call in the browser */}

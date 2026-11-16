@@ -2,6 +2,7 @@
 import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 import { callToken, livekitConfigured } from "@/lib/livekit";
 import { query } from "@/lib/db";
+import { isLang, type Lang } from "@/lib/copy";
 
 export async function POST(req: Request) {
   const userId = await getSessionUserId();
@@ -12,6 +13,6 @@ export async function POST(req: Request) {
 `SELECT u.display_name, u.preferred_language
 FROM users u
 WHERE u.user_id = $1`, [userId]);
-  const lang = body?.lang === "es" || (!body?.lang && u?.preferred_language === "es") ? "es" : "en";
+  const lang: Lang = isLang(body?.lang) ? body.lang : isLang(u?.preferred_language) ? u!.preferred_language : "en";
   return Response.json(callToken({ userId, name: u?.display_name, lang }));
 }

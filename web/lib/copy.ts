@@ -1,3 +1,4 @@
+import { COPY_ZH } from "./copy-zh";
 // lib/copy.ts
 // IVY OWNS THIS FILE: every word users see lives here (from "Continuity: All On-Screen Copy").
 // Change any text between quotes. Don't rename the keys on the left (the code uses them).
@@ -12,7 +13,15 @@ export const PLANS = [
   "Medicaid",
 ];
 
-export type Lang = "en" | "es";
+export type Lang = "en" | "es" | "zh";
+// Every language the site and the voice agent support, in the order the pickers show them
+export const LANGS: { code: Lang; name: string; locale: string; agentName: string }[] = [
+  { code: "en", name: "English", locale: "en-US", agentName: "English" },
+  { code: "es", name: "Español", locale: "es-US", agentName: "Spanish" },
+  { code: "zh", name: "中文", locale: "zh-CN", agentName: "Mandarin Chinese" },
+];
+export const isLang = (v: unknown): v is Lang => v === "en" || v === "es" || v === "zh";
+export const localeFor = (lang: Lang) => LANGS.find((l) => l.code === lang)?.locale ?? "en-US";
 
 export const COPY = {
   appName: "Continuity",
@@ -140,7 +149,7 @@ export const COPY = {
     privacyShort: "Your information is private. We only use it to help with your care.",
 
     language: "Language",
-    languages: { en: "English", es: "Español" },
+    languages: { en: "English", es: "Español", zh: "中文" },
 
     phoneTaken: "That phone number is already on another account. Leave it blank or use a different one.",
     moreMedsLater: "Take more than one? Add the rest in My care after setup.",
@@ -209,7 +218,7 @@ export const COPY = {
     setup: "Set up my plan",
     hi: (name: string) => `Hi, ${name}`,
     talk: "Talk to Continuity",
-    talkHelp: "A voice call right here, in English or Spanish.",
+    talkHelp: "A voice call right here, in English, Spanish or Chinese.",
     orFacetime: "Or FaceTime the line",
     nextSteps: "Next steps",
     onTrack: (d: string) => `On track · runs out ${d}`,
@@ -299,6 +308,7 @@ export const COPY = {
     website: "Website",
     allDay: "24/7",
     emergency: "In danger right now? Call 911.",
+    interpreter: "Need another language? Call 988 and ask for an interpreter. They offer over 240 languages by phone.",
     privacy: "What you type here isn't saved.",
     link: "Get support now",
   },
@@ -539,7 +549,7 @@ export const COPY_ES: typeof COPY = {
     privacyShort: "Tu información es privada. Solo la usamos para ayudarte con tu cuidado.",
 
     language: "Idioma",
-    languages: { en: "English", es: "Español" },
+    languages: { en: "English", es: "Español", zh: "中文" },
 
     phoneTaken: "Ese número ya está en otra cuenta. Déjalo en blanco o usa otro.",
     moreMedsLater: "¿Tomas más de uno? Agrega los demás en Mi atención después de la configuración.",
@@ -608,7 +618,7 @@ export const COPY_ES: typeof COPY = {
     setup: "Crear mi plan",
     hi: (name: string) => `Hola, ${name}`,
     talk: "Habla con Continuity",
-    talkHelp: "Una llamada de voz aquí mismo, en inglés o español.",
+    talkHelp: "Una llamada de voz aquí mismo, en inglés, español o chino.",
     orFacetime: "O llama por FaceTime",
     nextSteps: "Próximos pasos",
     onTrack: (d: string) => `Todo en orden · se acaba el ${d}`,
@@ -698,6 +708,7 @@ export const COPY_ES: typeof COPY = {
     website: "Sitio web",
     allDay: "24/7",
     emergency: "¿Estás en peligro ahora? Llama al 911.",
+    interpreter: "¿Necesitas otro idioma? Llama al 988 y pide un intérprete. Ofrecen más de 240 idiomas por teléfono.",
     privacy: "Lo que escribas aquí no se guarda.",
     link: "Recibe apoyo ahora",
   },
@@ -808,4 +819,4 @@ export const COPY_ES: typeof COPY = {
   },
 };
 
-export const copyFor = (lang: Lang) => (lang === "es" ? COPY_ES : COPY);
+export const copyFor = (lang: Lang) => (lang === "es" ? COPY_ES : lang === "zh" ? COPY_ZH : COPY);
