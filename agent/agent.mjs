@@ -3,7 +3,6 @@ import { AutoSubscribe, defineAgent, llm, voice } from '@livekit/agents';
 import * as google from '@livekit/agents-plugin-google';
 import { z } from 'zod';
 import { runAgent } from './chert-rooms.mjs';
-import { greetOnBridgeReady } from './greet.mjs';
 import { startAvatar } from './avatar.mjs';
 import { instructions } from './persona.mjs'; // shared with iMessage
 
@@ -13,8 +12,16 @@ const RealtimeModel = google.beta?.realtime?.RealtimeModel ?? google.realtime?.R
 // Continuity's web app (local while testing, the Vercel URL for the demo) + the shared secret for /api/agent/*
 const API = (process.env.CONTINUITY_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const AGENT_KEY = process.env.AGENT_API_KEY || '';
-// Who is calling. Chert doesn't tell us the caller's account yet, so the demo uses one user (Maya).
-const USER_ID = Number(process.env.CONTINUITY_USER_ID || 1);
+// Who is calling. Web calls (the "Talk to Continuity" button) carry the signed-in user's id in the job metadata.
+// FaceTime calls through Chert don't say who is calling, so they fall back to CONTINUITY_USER_ID (the demo student).
+const FALLBACK_USER_ID = Number(process.env.CONTINUITY_USER_ID || 1);
+function callInfo(ctx) {
+  try {
+    const m = JSON.parse(ctx.job?.metadata || '{}');
+    if (Number.isInteger(m.userId) && m.userId > 0) return { userId: m.userId, channel: m.channel || 'web', lang: LANG_NAMES[m.lang] ? m.lang : 'en', name: m.name || null };
+  } catch { /* not JSON: a Chert call */ }
+  return { userId: FALLBACK_USER_ID, channel: 'other', lang: null, name: null };
+}
 
 async function api(path, init = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -35,11 +42,30 @@ const USER_STATE_EVENT = voice.AgentSessionEventTypes?.UserStateChanged ?? 'user
 // Used only after an automatic reconnect.
 const RESUME_NOTE = "\n\nNote: the audio connection just dropped for a moment and you reconnected in the middle of this call. Any appointment options you listed earlier are still valid by their option number.";
 const RESUME_LINE = "Say one short sentence: 'Sorry, I lost you for a second. Could you say that again?' In Spanish if the caller was speaking Spanish.";
-// Ivy's script: ask the language first, in both languages.
-const greeting = "Speak softly and slowly, in a calm, low-key, friendly tone, like a quiet room. Don't start loudly or with excitement. Say exactly: 'Hi, I'm Continuity. Would you like to talk in English or in Spanish? Hola, soy Continuity. ¿Prefieres hablar en inglés o en español?' Then wait. When they choose, greet them by name in that language, say you're an AI assistant, not a doctor or a nurse, and ask what they'd like help with. If something is urgent in get_care_status, offer to start there.";
+
+// Languages the app offers (codes match web/lib/copy.ts LANGS)
+const LANG_NAMES = { en: 'English', es: 'Spanish', zh: 'Mandarin Chinese' };
+
+// Web calls: the person already picked their language in the app. Hold to it for the whole call.
+function languageLock(lang) {
+  const name = LANG_NAMES[lang] || 'English';
+  const crisis = lang === 'zh'
+    ? "\n- Crisis lines: 988 counselors speak English and Spanish. For Mandarin, tell them to call 988 and say \"Mandarin\" to get a free interpreter (phone calls only, not texts). 911 also provides interpreters."
+    : '';
+  return `\n\nLanguage for this call (this overrides the Language section above)
+- The person chose ${name} in the Continuity app. Speak only ${name} for the entire call: greetings, questions, dates, numbers and safety lines.
+- Do not ask which language they want. Do not switch because of a single word, a name or an accent.
+- Switch only if they clearly ask you to (for example "can we talk in Spanish?"), then stay in the new language.${crisis}`;
+}
+
+const webGreeting = (lang) => lang === 'zh'
+  ? "用平静、温和、缓慢的语气说普通话。先不要调用任何工具：使用你已经拿到的照护状态。用对方的名字打招呼，说明你是 AI 助手，不是医生或护士，然后问对方需要什么帮助。如果有紧急的事，提出先处理那件事。"
+  : lang === 'es'
+  ? "Habla en voz baja y con calma. No llames a ninguna herramienta todavía: usa el estado de atención que ya tienes. Saluda por su nombre en español, di que eres una asistente de IA, no médica ni enfermera, y pregunta en qué le puedes ayudar. Si algo es urgente, ofrece empezar por ahí. Puede cambiar a inglés cuando quiera."
+  : "Speak softly and calmly. Don't call any tools yet: use the care status you already have. Greet them by name in English, say you're an AI assistant, not a doctor or a nurse, and ask what they'd like help with. If something is urgent, offer to start there. They can switch to Spanish any time.";
 
 // Tools are built per call so each call remembers the options it offered ("option 1" -> slot_id).
-function makeTools() {
+function makeTools(USER_ID) {
   let lastOptions = [];
   return {
     get_care_status: llm.tool({
@@ -115,13 +141,24 @@ function makeTools() {
 const agent = defineAgent({
   entry: async ctx => {
     await ctx.connect(undefined, AutoSubscribe.AUDIO_ONLY);
+    const call = callInfo(ctx);
+    const USER_ID = call.userId;
+    // Fetch the caller's status while waiting for the caller (no delay once they join), so the greeting needs no tool call (early tool calls trip Gemini's 1007)
+    let statusNote = '';
+    try {
+      const st = await api(`/api/agent/status?userId=${USER_ID}`, { signal: AbortSignal.timeout(4000) });
+      statusNote = `\n\nThe caller's care status, already fetched for you (use it for the greeting; call get_care_status only if they ask for an update later): ${JSON.stringify(st)}`;
+      console.log('[continuity] status prefetched for user', USER_ID);
+      if (!call.lang && LANG_NAMES[st?.preferred_language]) call.lang = st.preferred_language;
+    } catch (e) { console.warn('[continuity] could not prefetch status', e?.message || e); }
     // Join promptly, but wait for a caller before opening a paid model session.
     const caller = await ctx.waitForParticipant();
     const startedAt = Date.now();
-    const chertCallId = caller.identity.replace(/^chert-bridge-/, '');
+    const chertCallId = call.channel === 'web' ? `web-${ctx.room.name}` : caller.identity.replace(/^chert-bridge-/, '');
+    console.log(`[continuity] ${call.channel} call for user ${USER_ID}`);
 
     // Tools are made once per call, so "option 2" still means the same slot after a reconnect.
-    const tools = makeTools();
+    const tools = makeTools(USER_ID);
     const MAX_RECONNECTS = 3;
     let reconnects = 0;
     let shuttingDown = false;
@@ -216,9 +253,10 @@ const agent = defineAgent({
         }
       });
 
+      if (resumed) { try { ctx.room.unregisterByteStreamHandler('lk.agent.session'); } catch {} }
       await s.start({
         room: ctx.room,
-        agent: new voice.Agent({ instructions: resumed ? instructions + RESUME_NOTE : instructions, tools }),
+        agent: new voice.Agent({ instructions: instructions + statusNote + languageLock(call.lang) + (resumed ? RESUME_NOTE : ''), tools }),
         record: false,
         inputOptions: {
           participantIdentity: caller.identity,
@@ -254,9 +292,8 @@ const agent = defineAgent({
       console.warn('[avatar] could not publish video, continuing audio-only:', e?.message || e);
     }
     session = await openSession({ resumed: false });
-    // Greet once when Chert reports FaceTime is ready (the call ends if silent for 10 s after that).
-    const stopGreeting = greetOnBridgeReady(ctx.room, () => session.generateReply({ instructions: greeting }));
-    ctx.addShutdownCallback(async () => stopGreeting());
+    // The caller is connected and listening: greet right away, in the language they picked in the app
+    session.generateReply({ instructions: webGreeting(call.lang) });
   },
 });
 
