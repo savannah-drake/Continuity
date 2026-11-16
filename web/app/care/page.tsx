@@ -178,7 +178,7 @@ export default function CarePage() {
               <li key={`${a.visit_id ?? "s" + a.slot_id}-${a.slot_start}`} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-navy">{a.provider_name}</p>
-                  <p className="text-sm text-muted">{fmtSlot(a.slot_start)}{a.recurring ? ` · ${K.recurring}` : ""}</p>
+                  <p className="text-sm text-muted">{fmtSlot(a.slot_start)}{a.recurring ? ` · ${K.recurring}` : ""}{a.imported ? ` · ${K.fromCalendar}` : ""}</p>
                 </div>
                 {a.visit_id && (
                   <button className="shrink-0 text-sm text-muted" disabled={busy} onClick={() => send(`/api/visits?id=${a.visit_id}`, "DELETE")}>

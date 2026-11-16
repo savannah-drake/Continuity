@@ -5,6 +5,7 @@ import { pool } from "@/lib/db";
 import { isLang } from "@/lib/copy";
 import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 import { upsertMedication, syncMedReminders, cleanMed } from "@/lib/medications";
+import { importVisits } from "@/lib/importVisits";
 import { computeTimeline, computeTherapyTimeline } from "@/lib/engine";
 
 const todayET = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }); // YYYY-MM-DD
@@ -120,11 +121,18 @@ export async function PATCH(req: Request) {
     if (!c) return Response.json({ error: "zip_not_found" }, { status: 400 });
     add("home_zip", b.homeZip); add("home_lat", c.lat); add("home_lng", c.lng);
   }
+  if (typeof b.autoImportVisits === "boolean") add("auto_import_visits", b.autoImportVisits);
   if (!sets.length) return Response.json({ error: "nothing_to_update" }, { status: 400 });
   const r = await pool.query(
 `UPDATE users SET ${sets.join(", ")}
 WHERE user_id = $1
 RETURNING user_id`, vals);
   if (!r.rowCount) return Response.json({ error: "not_found" }, { status: 404 });
+  if (b.autoImportVisits === true) {
+    // Look right away instead of waiting for the next calendar refresh
+    const found = await importVisits(userId).catch((e) => { console.error("visit import failed", e); return { imported: 0 }; });
+    if (found.imported) await syncMedReminders(userId).catch(() => {});
+    return Response.json({ ok: true, imported: found.imported });
+  }
   return Response.json({ ok: true });
 }

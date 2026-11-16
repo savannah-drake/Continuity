@@ -19,13 +19,13 @@ export type CareMember = {
 export type Me = {
   today: string;
   needsOnboarding: boolean;
-  user: { user_id: number; display_name: string | null; email: string | null; insurance_plan: string; care_type: string;
+  user: { user_id: number; display_name: string | null; email: string | null; auto_import_visits?: boolean; insurance_plan: string; care_type: string;
     home_lat: number | null; home_lng: number | null; home_zip: string | null; preferred_language: string | null };
   medication: MedTimeline | null; // the one that runs out first
   medications: MedTimeline[];
   therapy: null | { nextSessionBy: string; bookBy: string; status: "green" | "yellow" | "red"; nextAction: string; sessionBooked: boolean };
   appointments: { slot_id: number | null; visit_id?: number; slot_start: string; duration_min: number; telehealth: boolean;
-    provider_name: string; provider_type: string; specialty: string | null; recurring?: boolean; source?: "continuity" | "care_team" }[];
+    provider_name: string; provider_type: string; specialty: string | null; recurring?: boolean; imported?: boolean; source?: "continuity" | "care_team" }[];
   careTeam: CareMember[];
 };
 

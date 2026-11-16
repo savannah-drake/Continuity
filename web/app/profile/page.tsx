@@ -27,6 +27,8 @@ function ProfilePage() {
   const [zip, setZip] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [cal, setCal] = useState<CalStatus | null>(null);
+  const [autoImport, setAutoImport] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
   const params = useSearchParams();
   const S = C.calendarSync;
   const [calNote, setCalNote] = useState<string | null>(
@@ -55,6 +57,7 @@ function ProfilePage() {
     setName(me.user.display_name ?? "");
     setPlan(me.user.insurance_plan ?? "");
     setZip(me.user.home_zip ?? "");
+    setAutoImport(!!me.user.auto_import_visits);
   }, [me]);
 
   const loadCalendar = () => {
@@ -84,6 +87,17 @@ function ProfilePage() {
     await fetch("/api/calendar", { method: "DELETE" }).catch(() => {});
     setCalNote(null);
     loadCalendar();
+  }
+
+  async function toggleAutoImport(on: boolean) {
+    setAutoImport(on);
+    setImportNote(null);
+    const res = await fetch("/api/users", {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autoImportVisits: on }),
+    }).catch(() => null);
+    if (!res?.ok) { setAutoImport(!on); return; }
+    const d = await res.json().catch(() => ({}));
+    if (on) setImportNote(S.importFound(d.imported ?? 0));
   }
 
   async function disconnectGoogle() {
@@ -168,6 +182,11 @@ function ProfilePage() {
                 {cal.google.needsReconnect && <a href="/api/auth/google?calendar=1&next=/profile" className="text-brand">{S.connect}</a>}
                 <button type="button" onClick={disconnectGoogle} className="text-muted">{S.disconnect}</button>
               </div>
+              <label className="mt-4 flex items-start gap-3 border-t border-line pt-3 text-sm text-navy">
+                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#5AA9D8]" checked={autoImport} onChange={(e) => toggleAutoImport(e.target.checked)} />
+                <span><span className="font-semibold">{S.importTitle}</span><br /><span className="text-muted">{S.importExplain}</span></span>
+              </label>
+              {importNote && <p className="mt-2 text-sm text-muted">{importNote}</p>}
             </>
           ) : (
             <>

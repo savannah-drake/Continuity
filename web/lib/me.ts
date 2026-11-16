@@ -43,7 +43,7 @@ export async function getMe(userId: number) {
   const today = todayET();
 
   const users = await query(
-`SELECT u.user_id, u.display_name, u.email, u.insurance_plan, u.care_type, u.home_lat, u.home_lng, u.home_zip, u.preferred_language, to_char(u.last_therapy_session, 'YYYY-MM-DD') AS last_therapy_session, u.therapy_cadence_days
+`SELECT u.user_id, u.display_name, u.email, u.auto_import_visits, u.insurance_plan, u.care_type, u.home_lat, u.home_lng, u.home_zip, u.preferred_language, to_char(u.last_therapy_session, 'YYYY-MM-DD') AS last_therapy_session, u.therapy_cadence_days
 FROM users u
 WHERE u.user_id = $1`,
     [userId],
@@ -91,7 +91,7 @@ ORDER BY c.created_at`,
     [userId],
   ).catch(() => [] as CareMember[]); // before v2-accounts.sql has been run
   const visitRows = await query(
-`SELECT v.visit_id, v.member_id, v.starts_at, v.duration_min, v.video, v.repeat_every_weeks, to_char(v.repeat_until, 'YYYY-MM-DD') AS repeat_until, c.provider_name, c.source_site, c.role
+`SELECT v.visit_id, v.member_id, v.starts_at, v.duration_min, v.video, v.repeat_every_weeks, v.source, to_char(v.repeat_until, 'YYYY-MM-DD') AS repeat_until, c.provider_name, c.source_site, c.role
 FROM visits v
 LEFT JOIN care_team c ON c.member_id = v.member_id
 WHERE v.user_id = $1
@@ -106,7 +106,7 @@ AND v.status = 'scheduled'`,
     ...visits.map((v) => ({
       slot_id: null, visit_id: v.visit_id, slot_start: v.starts_at, duration_min: v.duration_min, telehealth: v.video,
       provider_name: v.provider_name || siteLabel(v.source_site, v.role), provider_type: v.role === "psychiatrist" ? "psychiatrist" : "therapist",
-      specialty: null, recurring: !!v.repeat_every_weeks, source: "care_team",
+      specialty: null, recurring: !!v.repeat_every_weeks, source: "care_team", imported: (v as any).source === "imported",
     })),
   ].sort((a, b) => String(a.slot_start).localeCompare(String(b.slot_start))).slice(0, 8);
 

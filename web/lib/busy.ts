@@ -3,6 +3,8 @@
 import { pool, query } from "./db";
 import { parseIcs, type Busy } from "./calendar";
 import { freeBusy, getConnection } from "./google";
+import { importVisits } from "./importVisits";
+import { syncMedReminders } from "./medications";
 
 const DAY = 24 * 3600 * 1000;
 
@@ -82,6 +84,11 @@ WHERE user_id = $1`, [userId]);
   } finally {
     client.release();
   }
+  // Auto-import booking confirmations (no-op unless the user turned it on in Profile)
+  try {
+    const r = await importVisits(userId);
+    if (r.imported) await syncMedReminders(userId); // a new visit can clear a "book by" deadline
+  } catch (e) { console.error("visit import failed", e); }
   return { synced: true, count: blocks.length };
 }
 
