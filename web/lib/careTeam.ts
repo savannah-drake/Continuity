@@ -15,6 +15,7 @@ export function siteFromUrl(url?: string | null) {
     if (host.endsWith("zocdoc.com")) return "zocdoc";
     if (host.endsWith("growtherapy.com")) return "grow";
     if (host.endsWith("psychologytoday.com")) return "psychologytoday";
+    if (host.endsWith("therapyden.com")) return "therapyden";
     if (host.endsWith("timelycare.com")) return "timelycare";
     return "other";
   } catch { return null; }

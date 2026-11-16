@@ -152,7 +152,7 @@ AND v.status = 'scheduled'`,
 }
 
 export const SITES: Record<string, string> = {
-  zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", timelycare: "TimelyCare",
+  zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", therapyden: "TherapyDen", timelycare: "TimelyCare",
 };
 export function siteLabel(site: string | null, role?: string | null) {
   const who = role === "psychiatrist" ? "psychiatrist" : "therapist";

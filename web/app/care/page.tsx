@@ -10,7 +10,7 @@ import { SuggestInput } from "@/components/Suggest";
 import { Screen, Field, inputClass, BottomNav } from "@/components/ui";
 import { ExternalIcon, PhoneIcon, PlusIcon } from "@/components/icons";
 
-const SITE_NAMES: Record<string, string> = { zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", timelycare: "TimelyCare" };
+const SITE_NAMES: Record<string, string> = { zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", therapyden: "TherapyDen", timelycare: "TimelyCare" };
 
 const dot = (status: string) => (status === "red" ? "bg-coral" : status === "yellow" ? "bg-attn" : "bg-live");
 
@@ -58,6 +58,7 @@ export default function CarePage() {
     { key: "psychologytoday", href: `https://www.psychologytoday.com/us/psychiatrists/${zip}` },
     { key: "zocdoc", href: "https://www.zocdoc.com/psychiatrists" },
     { key: "grow", href: "https://growtherapy.com/" },
+    { key: "therapyden", href: "https://www.therapyden.com/" },
   ] as const;
 
   return (

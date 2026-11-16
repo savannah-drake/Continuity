@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     // The person's own providers. To book with them, they use the link or phone in the app (you can't book these yourself).
     care_team: me.careTeam.map((c) => ({
       who: c.provider_name || `their ${c.role}`, role: c.role,
-      books_through: c.source_site === "zocdoc" ? "Zocdoc" : c.source_site === "grow" ? "Grow Therapy" : c.source_site === "psychologytoday" ? "Psychology Today" : c.booking_url ? "a booking link" : c.phone ? "phone" : null,
+      books_through: c.source_site === "zocdoc" ? "Zocdoc" : c.source_site === "grow" ? "Grow Therapy" : c.source_site === "psychologytoday" ? "Psychology Today" : c.source_site === "therapyden" ? "TherapyDen" : c.booking_url ? "a booking link" : c.phone ? "phone" : null,
     })),
   });
 }
