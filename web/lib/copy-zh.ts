@@ -198,7 +198,7 @@ export const COPY_ZH: typeof COPY = {
     setup: "设置我的计划",
     hi: (name: string) => `你好，${name}`,
     talk: "和 Continuity 说话",
-    talkHelp: "就在这里语音通话，可以说中文、英语或西班牙语。",
+    talkHelp: "就在这里语音通话，用你选择的语言。",
     orFacetime: "或用 FaceTime 拨打专线",
     nextSteps: "下一步",
     onTrack: (d: string) => `一切正常 · ${d} 用完`,

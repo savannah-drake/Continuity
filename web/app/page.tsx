@@ -10,9 +10,6 @@ import { useMe, fmtShort, fmtSlot, providersHref } from "@/lib/useMe";
 import { Screen, BottomNav } from "@/components/ui";
 import { ArrowIcon } from "@/components/icons";
 
-// Optional: the Chert FaceTime line (NEXT_PUBLIC_CHERT_FACETIME_NUMBER, e.g. +16504444331)
-const FACETIME_NUMBER = process.env.NEXT_PUBLIC_CHERT_FACETIME_NUMBER;
-
 const dot = (status: string) => (status === "red" ? "bg-coral" : status === "yellow" ? "bg-attn" : "bg-live");
 
 export default function HomePage() {
@@ -53,7 +50,7 @@ function Home() {
       </header>
 
       {/* Voice call in the browser */}
-      <Link href="/call" className="mb-2 flex items-center gap-4 rounded-2xl bg-brand px-4 py-3 text-white hover:brightness-95">
+      <Link href="/call" className="flex items-center gap-4 rounded-2xl bg-brand px-4 py-3 text-white hover:brightness-95">
         <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/mascot.png" alt="" className="h-full w-full object-contain" />
@@ -64,10 +61,7 @@ function Home() {
         </span>
         <ArrowIcon size={20} />
       </Link>
-      {FACETIME_NUMBER && (
-        <a href={`facetime:${FACETIME_NUMBER}`} className="mb-6 block text-center text-[13px] font-semibold text-brand">{H.orFacetime}</a>
-      )}
-      {!FACETIME_NUMBER && <div className="mb-6" />}
+      <div className="mb-6" />
 
       {/* What's next, in one list */}
       <h2 className="mb-2 text-[15px] font-bold text-navy">{H.nextSteps}</h2>

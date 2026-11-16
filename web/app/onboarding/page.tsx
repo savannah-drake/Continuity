@@ -1,7 +1,6 @@
 // app/onboarding/page.tsx: 4 steps (About you → Insurance → Your care → Calendar and location), after Google sign-in.
 // Language (English/Español) can be switched on step 1; location saves home_lat/home_lng for Typesense geo search.
 "use client";
-import { formatPhone, phoneE164 } from "@/lib/format";
 import { SuggestInput } from "@/components/Suggest";
 import { useEffect, useState } from "react";
 import { useMe } from "@/lib/useMe";
@@ -21,7 +20,6 @@ export default function Onboarding() {
   const { me, state } = useMe();
   const [step, setStep] = useState(1);
   const [displayName, setDisplayName] = useState("");
-  const [phone, setPhone] = useState("");
   const [insurancePlan, setInsurancePlan] = useState(PLANS[0]);
   const [careType, setCareType] = useState<CareType>("both");
   const [medLabel, setMedLabel] = useState("");
@@ -88,7 +86,7 @@ export default function Onboarding() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          displayName, phone: phone.trim() ? phoneE164(phone) : undefined, insurancePlan, careType,
+          displayName, insurancePlan, careType,
           preferredLanguage: lang,
           homeZip: zip || undefined,
           homeLat: coords?.lat, homeLng: coords?.lng,
@@ -137,9 +135,6 @@ export default function Onboarding() {
             </Field>
             <Field label={C.nameLabel} help={C.nameHelp}>
               <input className={inputClass} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Maya" />
-            </Field>
-            <Field label={C.phoneLabel} help={C.phoneHelp}>
-              <input className={inputClass} type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="(404) 555-0100" />
             </Field>
           </div>
         </>

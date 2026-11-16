@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const t = me.therapy;
   return Response.json({
     name: me.user.display_name,
+    preferred_language: me.user.preferred_language || "en",
     insurance_plan: me.user.insurance_plan,
     medication: m && {
       nickname: m.label,
