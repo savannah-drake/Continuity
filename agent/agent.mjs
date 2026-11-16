@@ -13,16 +13,8 @@ const RealtimeModel = google.beta?.realtime?.RealtimeModel ?? google.realtime?.R
 // Continuity's web app (local while testing, the Vercel URL for the demo) + the shared secret for /api/agent/*
 const API = (process.env.CONTINUITY_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const AGENT_KEY = process.env.AGENT_API_KEY || '';
-// Who is calling. Web calls (the "Talk to Continuity" button) carry the signed-in user's id in the job metadata.
-// FaceTime calls through Chert don't say who is calling, so they fall back to CONTINUITY_USER_ID (the demo student).
-const FALLBACK_USER_ID = Number(process.env.CONTINUITY_USER_ID || 1);
-function callInfo(ctx) {
-  try {
-    const m = JSON.parse(ctx.job?.metadata || '{}');
-    if (Number.isInteger(m.userId) && m.userId > 0) return { userId: m.userId, channel: m.channel || 'web', lang: m.lang === 'es' ? 'es' : 'en', name: m.name || null };
-  } catch { /* not JSON: a Chert call */ }
-  return { userId: FALLBACK_USER_ID, channel: 'facetime', lang: null, name: null };
-}
+// Who is calling. Chert doesn't tell us the caller's account yet, so the demo uses one user (Maya).
+const USER_ID = Number(process.env.CONTINUITY_USER_ID || 1);
 
 async function api(path, init = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -46,13 +38,8 @@ const RESUME_LINE = "Say one short sentence: 'Sorry, I lost you for a second. Co
 // Ivy's script: ask the language first, in both languages.
 const greeting = "Speak softly and slowly, in a calm, low-key, friendly tone, like a quiet room. Don't start loudly or with excitement. Say exactly: 'Hi, I'm Continuity. Would you like to talk in English or in Spanish? Hola, soy Continuity. ¿Prefieres hablar en inglés o en español?' Then wait. When they choose, greet them by name in that language, say you're an AI assistant, not a doctor or a nurse, and ask what they'd like help with. If something is urgent in get_care_status, offer to start there.";
 
-// Web calls: the person already picked their language in the app, so skip the language question.
-const webGreeting = (lang) => lang === 'es'
-  ? "Habla en voz baja y con calma. Llama a get_care_status primero. Luego saluda por su nombre en español, di que eres una asistente de IA, no médica ni enfermera, y pregunta en qué le puedes ayudar. Si algo es urgente, ofrece empezar por ahí. Puede cambiar a inglés cuando quiera."
-  : "Speak softly and calmly. Call get_care_status first. Then greet them by name in English, say you're an AI assistant, not a doctor or a nurse, and ask what they'd like help with. If something is urgent, offer to start there. They can switch to Spanish any time.";
-
 // Tools are built per call so each call remembers the options it offered ("option 1" -> slot_id).
-function makeTools(USER_ID) {
+function makeTools() {
   let lastOptions = [];
   return {
     get_care_status: llm.tool({
@@ -131,13 +118,10 @@ const agent = defineAgent({
     // Join promptly, but wait for a caller before opening a paid model session.
     const caller = await ctx.waitForParticipant();
     const startedAt = Date.now();
-    const call = callInfo(ctx);
-    const USER_ID = call.userId;
-    const chertCallId = call.channel === 'web' ? `web-${ctx.room.name}` : caller.identity.replace(/^chert-bridge-/, '');
-    console.log(`[continuity] ${call.channel} call for user ${USER_ID}`);
+    const chertCallId = caller.identity.replace(/^chert-bridge-/, '');
 
     // Tools are made once per call, so "option 2" still means the same slot after a reconnect.
-    const tools = makeTools(USER_ID);
+    const tools = makeTools();
     const MAX_RECONNECTS = 3;
     let reconnects = 0;
     let shuttingDown = false;
@@ -270,14 +254,9 @@ const agent = defineAgent({
       console.warn('[avatar] could not publish video, continuing audio-only:', e?.message || e);
     }
     session = await openSession({ resumed: false });
-    if (call.channel === 'web') {
-      // The browser is connected and listening already: greet right away
-      session.generateReply({ instructions: webGreeting(call.lang) });
-    } else {
-      // Greet once when Chert reports FaceTime is ready (the call ends if silent for 10 s after that).
-      const stopGreeting = greetOnBridgeReady(ctx.room, () => session.generateReply({ instructions: greeting }));
-      ctx.addShutdownCallback(async () => stopGreeting());
-    }
+    // Greet once when Chert reports FaceTime is ready (the call ends if silent for 10 s after that).
+    const stopGreeting = greetOnBridgeReady(ctx.room, () => session.generateReply({ instructions: greeting }));
+    ctx.addShutdownCallback(async () => stopGreeting());
   },
 });
 
