@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  cacheComponents: true,
+reactStrictMode: false,  
+cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
     rules: {

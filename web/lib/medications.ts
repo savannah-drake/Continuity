@@ -1,5 +1,5 @@
 // lib/medications.ts: add, edit and remove a user's medications, and keep their Google Calendar reminders in step:
-// - a daily "Take <med>" reminder at the time they pick
+// - a daily "Take your medication" reminder at the time they pick (never the medication's name, for privacy)
 // - a "Book your visit by <date>" deadline when a renewal visit is needed (moves when dates change, removed once a visit is scheduled)
 import type { PoolClient } from "pg";
 import { pool, query } from "./db";
@@ -105,7 +105,8 @@ AND m.active`, [userId]);
     // 1) Daily "take your medication" reminder. Re-created when the time changes (simplest way to move a series).
     const wantTime = validTime(row.reminder_time);
     const [hh, mm] = (wantTime ?? "00:00").split(":").map(Number);
-    const reminderKey = wantTime ? `${wantTime}` : null;
+    // "p" = private title (no medication name); older events without it get replaced once
+    const reminderKey = wantTime ? `p${wantTime}` : null;
     try {
       if (row.reminder_event_id && (!reminderKey || !row.reminder_event_id.endsWith(`#${reminderKey}`))) {
         await deleteEvent(userId, row.reminder_event_id.split("#")[0]);
@@ -118,7 +119,7 @@ WHERE medication_id = $1`, [row.medication_id]);
       if (reminderKey && !row.reminder_event_id) {
         const start = etDateTime(me.today, hh, mm);
         const id = await createEvent(userId, {
-          title: `Take ${med.label}`, details: "Daily reminder from Continuity. Change or turn it off in the app.",
+          title: "Take your medication", details: "Daily reminder from Continuity. Change or turn it off in the app.",
           start, durationMin: 5, rrule: "RRULE:FREQ=DAILY", reminderMinutes: [0],
         });
         if (id) await query(
@@ -140,8 +141,8 @@ SET book_by_event_id = NULL, book_by_date = NULL
 WHERE medication_id = $1`, [row.medication_id]);
       } else if (wantDate && wantDate !== row.book_by_date) {
         const visit = {
-          title: `Book your visit for ${med.label}`,
-          details: `Book a visit with your prescriber by today so your ${med.label} refill doesn't lapse. Open Continuity to find a time that fits.`,
+          title: "Book a psychiatry visit",
+          details: "Book a visit with your prescriber so your refill doesn't lapse. Open Continuity for the details.",
           start: etDateTime(wantDate, 9, 0), durationMin: 15, reminderMinutes: [3 * 24 * 60, 0],
         };
         if (row.book_by_event_id) await updateEvent(userId, row.book_by_event_id, visit);

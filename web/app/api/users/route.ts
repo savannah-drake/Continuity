@@ -2,8 +2,10 @@
 // POST /api/users: saves onboarding for the signed-in user (profile + optional medication) and returns the timeline.
 // PATCH /api/users: Profile edits for the signed-in user.
 import { pool } from "@/lib/db";
+import { isLang } from "@/lib/copy";
 import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 import { upsertMedication, syncMedReminders, cleanMed } from "@/lib/medications";
+import { importVisits } from "@/lib/importVisits";
 import { computeTimeline, computeTherapyTimeline } from "@/lib/engine";
 
 const todayET = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }); // YYYY-MM-DD
@@ -13,7 +15,7 @@ type Body = {
   phone?: string;
   insurancePlan: string;
   careType: "psychiatry" | "therapy" | "both";
-  preferredLanguage?: "en" | "es";
+  preferredLanguage?: "en" | "es" | "zh";
   homeZip?: string;
   homeLat?: number;
   homeLng?: number;
@@ -113,17 +115,26 @@ export async function PATCH(req: Request) {
   const add = (col: string, v: unknown) => { vals.push(v); sets.push(`${col} = $${vals.length}`); };
   if (typeof b.displayName === "string" && b.displayName.trim()) add("display_name", b.displayName.trim().slice(0, 60));
   if (typeof b.insurancePlan === "string" && b.insurancePlan.trim()) add("insurance_plan", b.insurancePlan.trim().slice(0, 80));
-  if (b.preferredLanguage === "en" || b.preferredLanguage === "es") add("preferred_language", b.preferredLanguage);
+  if (isLang(b.preferredLanguage)) add("preferred_language", b.preferredLanguage);
   if (typeof b.homeZip === "string" && /^\d{5}$/.test(b.homeZip)) {
     const c = await zipToCoords(b.homeZip);
     if (!c) return Response.json({ error: "zip_not_found" }, { status: 400 });
     add("home_zip", b.homeZip); add("home_lat", c.lat); add("home_lng", c.lng);
   }
+  if (typeof b.autoImportVisits === "boolean") add("auto_import_visits", b.autoImportVisits);
+  if (typeof b.alertEmail === "boolean") add("alert_email", b.alertEmail);
   if (!sets.length) return Response.json({ error: "nothing_to_update" }, { status: 400 });
   const r = await pool.query(
 `UPDATE users SET ${sets.join(", ")}
 WHERE user_id = $1
 RETURNING user_id`, vals);
   if (!r.rowCount) return Response.json({ error: "not_found" }, { status: 404 });
+  if (b.autoImportVisits === true) {
+    // Look right away instead of waiting for the next calendar refresh
+    const found: { imported: number; checked?: number; matched?: number; skipped?: string } =
+      await importVisits(userId).catch((e) => { console.error("visit import failed", e); return { imported: 0, skipped: "error" }; });
+    if (found.imported) await syncMedReminders(userId).catch(() => {});
+    return Response.json({ ok: true, ...found });
+  }
   return Response.json({ ok: true });
 }

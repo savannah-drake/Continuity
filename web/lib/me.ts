@@ -43,7 +43,7 @@ export async function getMe(userId: number) {
   const today = todayET();
 
   const users = await query(
-`SELECT u.user_id, u.display_name, u.email, u.insurance_plan, u.care_type, u.home_lat, u.home_lng, u.home_zip, u.preferred_language, to_char(u.last_therapy_session, 'YYYY-MM-DD') AS last_therapy_session, u.therapy_cadence_days
+`SELECT u.user_id, u.display_name, u.email, u.auto_import_visits, u.alert_email, u.insurance_plan, u.care_type, u.home_lat, u.home_lng, u.home_zip, u.preferred_language, to_char(u.last_therapy_session, 'YYYY-MM-DD') AS last_therapy_session, u.therapy_cadence_days
 FROM users u
 WHERE u.user_id = $1`,
     [userId],
@@ -61,27 +61,6 @@ ORDER BY m.supply_as_of + m.days_supply_remaining, m.medication_id`,
     [userId],
   );
 
-  // Simulated slots requested through Continuity's own search
-  const slotAppointments = await query(
-`SELECT DISTINCT s.slot_id, s.slot_start, s.duration_min, s.telehealth, p.provider_name, p.provider_type, p.specialty
-FROM booking_events b
-JOIN appointment_slots s ON s.slot_id = b.slot_id
-JOIN providers p ON p.provider_id = s.provider_id
-WHERE b.user_id = $1
-AND b.event_type = 'confirmed'
-AND s.slot_status = 'booked'
-AND s.slot_start > now()
-AND NOT EXISTS (SELECT 1
-FROM booking_events b2
-WHERE b2.user_id = b.user_id
-AND b2.slot_id = b.slot_id
-AND b2.event_type = 'cancelled'
-AND b2.event_time > b.event_time)
-ORDER BY s.slot_start
-LIMIT 5`,
-    [userId],
-  );
-
   // Your own providers and the visits you scheduled with them
   const careTeam = await query<CareMember>(
 `SELECT c.member_id, c.provider_name, c.source_site, c.role, c.phone, c.booking_url, c.video, c.notes
@@ -91,7 +70,7 @@ ORDER BY c.created_at`,
     [userId],
   ).catch(() => [] as CareMember[]); // before v2-accounts.sql has been run
   const visitRows = await query(
-`SELECT v.visit_id, v.member_id, v.starts_at, v.duration_min, v.video, v.repeat_every_weeks, to_char(v.repeat_until, 'YYYY-MM-DD') AS repeat_until, c.provider_name, c.source_site, c.role
+`SELECT v.visit_id, v.member_id, v.starts_at, v.duration_min, v.video, v.repeat_every_weeks, v.source, to_char(v.repeat_until, 'YYYY-MM-DD') AS repeat_until, c.provider_name, c.source_site, c.role
 FROM visits v
 LEFT JOIN care_team c ON c.member_id = v.member_id
 WHERE v.user_id = $1
@@ -102,11 +81,10 @@ AND v.status = 'scheduled'`,
 
   // One list of upcoming appointments for Home, Timeline and the agent
   const appointments = [
-    ...slotAppointments.map((a: any) => ({ ...a, source: "continuity" })),
     ...visits.map((v) => ({
       slot_id: null, visit_id: v.visit_id, slot_start: v.starts_at, duration_min: v.duration_min, telehealth: v.video,
       provider_name: v.provider_name || siteLabel(v.source_site, v.role), provider_type: v.role === "psychiatrist" ? "psychiatrist" : "therapist",
-      specialty: null, recurring: !!v.repeat_every_weeks, source: "care_team",
+      specialty: null, recurring: !!v.repeat_every_weeks, source: "care_team", imported: (v as any).source === "imported",
     })),
   ].sort((a, b) => String(a.slot_start).localeCompare(String(b.slot_start))).slice(0, 8);
 
@@ -114,9 +92,13 @@ AND v.status = 'scheduled'`,
     const t = computeTimeline(
       { daysSupplyRemaining: m.days_supply_remaining, supplyAsOf: m.supply_as_of, refillsRemaining: m.refills_remaining,
         rxExpiresOn: m.rx_expires_on, requiresAppointmentForRenewal: m.requires_appointment_for_renewal,
-        bookingLeadDays: m.booking_lead_days ?? 14 },
+        bookingLeadDays: 14 }, // aim to book about two weeks before the visit deadline
       today,
     );
+    // Never show a date that already passed. If the ideal book-by date is gone, it's "book now"; if the ideal visit
+    // date is gone too, the goal becomes a visit before the supply runs out (or as soon as possible).
+    if (t.bookApptBy && t.bookApptBy < today) t.bookApptBy = today;
+    if (t.apptBy && t.apptBy < today) t.apptBy = t.supplyEndDate > today ? t.supplyEndDate : today;
     // A psychiatry visit on or before the appointment deadline satisfies the renewal step
     const psychVisit = t.apptBy
       ? appointments.find((a: any) => a.provider_type === "psychiatrist" && dayET(a.slot_start) <= t.apptBy!)
@@ -152,7 +134,7 @@ AND v.status = 'scheduled'`,
 }
 
 export const SITES: Record<string, string> = {
-  zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", timelycare: "TimelyCare",
+  zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", therapyden: "TherapyDen", timelycare: "TimelyCare",
 };
 export function siteLabel(site: string | null, role?: string | null) {
   const who = role === "psychiatrist" ? "psychiatrist" : "therapist";

@@ -1,13 +1,13 @@
 // lib/i18n.ts: current language (English / Español), saved in the browser and on the user's profile.
 "use client";
 import { useSyncExternalStore } from "react";
-import { copyFor, type Lang } from "./copy";
+import { copyFor, isLang, type Lang } from "./copy";
 
 const KEY = "continuity_lang";
 const EVENT = "continuity-lang";
 
 function read(): Lang {
-  try { return localStorage.getItem(KEY) === "es" ? "es" : "en"; } catch { return "en"; }
+  try { const v = localStorage.getItem(KEY); return isLang(v) ? v : "en"; } catch { return "en"; }
 }
 function subscribe(cb: () => void) {
   window.addEventListener(EVENT, cb);

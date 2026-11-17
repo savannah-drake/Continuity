@@ -2,15 +2,17 @@
 // the people you see (a booking link from Zocdoc / Grow Therapy / Psychology Today is enough), and your visits,
 // one-off or recurring. Visits and reminders go on Google Calendar when it's connected.
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCopy } from "@/lib/i18n";
-import { useMe, fmtShort, fmtSlot, type MedTimeline, type CareMember } from "@/lib/useMe";
+import { useMe, visitLine, fmtShort, fmtSlot, type MedTimeline, type CareMember } from "@/lib/useMe";
 import { SuggestInput } from "@/components/Suggest";
 import { Screen, Field, inputClass, BottomNav } from "@/components/ui";
 import { ExternalIcon, PhoneIcon, PlusIcon } from "@/components/icons";
+import { findLinks } from "@/lib/findLinks";
+import { PLANS } from "@/lib/copy";
 
-const SITE_NAMES: Record<string, string> = { zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", timelycare: "TimelyCare" };
+const SITE_NAMES: Record<string, string> = { zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", therapyden: "TherapyDen", timelycare: "TimelyCare" };
 
 const dot = (status: string) => (status === "red" ? "bg-coral" : status === "yellow" ? "bg-attn" : "bg-live");
 
@@ -38,6 +40,25 @@ export default function CarePage() {
   const [visitForm, setVisitForm] = useState<null | VisitDraft>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // After "Book" opens Zocdoc / Grow / etc. in another tab, ask on return whether they booked
+  const [bookingWith, setBookingWith] = useState<number | null>(null);
+  const [findKind, setFindKind] = useState<"psychiatrist" | "therapist">("psychiatrist");
+  const [findPlan, setFindPlan] = useState<string | null>(null);
+  const [askBooked, setAskBooked] = useState<number | null>(null);
+  // Calendar events like "Appointment with Antionette Holt" that might be visits (only when auto-import is on)
+  const [suggestions, setSuggestions] = useState<{ eventId: string; name: string; startsAt: string }[]>([]);
+  const autoImport = !!me?.user.auto_import_visits;
+  useEffect(() => {
+    if (!autoImport) return;
+    fetch("/api/visits/suggestions").then((r) => (r.ok ? r.json() : { suggestions: [] })).then((d) => setSuggestions(d.suggestions ?? [])).catch(() => {});
+  }, [autoImport]);
+  useEffect(() => {
+    if (!bookingWith) return;
+    const onBack = () => { if (document.visibilityState === "visible") { setAskBooked(bookingWith); setBookingWith(null); } };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => { document.removeEventListener("visibilitychange", onBack); window.removeEventListener("focus", onBack); };
+  }, [bookingWith]);
 
   if (state === "loading") return <Screen nav><p className="text-muted">{C.booking.loading}</p><BottomNav active="care" /></Screen>;
   if (state !== "ready" || !me) {
@@ -53,18 +74,50 @@ export default function CarePage() {
     return res.json().catch(() => ({}));
   }
 
-  const zip = me.user.home_zip || "30322";
-  const find = [
-    { key: "psychologytoday", href: `https://www.psychologytoday.com/us/psychiatrists/${zip}` },
-    { key: "zocdoc", href: "https://www.zocdoc.com/psychiatrists" },
-    { key: "grow", href: "https://growtherapy.com/" },
-  ] as const;
+  const plan = findPlan ?? me.user.insurance_plan ?? "";
+  const links = findLinks({ plan, kind: findKind, zip: me.user.home_zip });
+  const find = (["psychologytoday", "zocdoc", "grow", "therapyden"] as const).map((key) => ({ key, href: links[key], filtered: links.filtered[key] }));
 
   return (
     <Screen nav>
       <h1 className="text-[26px] font-bold text-navy">{K.title}</h1>
       <p className="mb-6 text-sm text-muted">{K.sub}</p>
       {note && <p className="mb-4 text-sm text-navy" role="status">{note}</p>}
+
+      {/* Back from the booking site: save the visit they just booked */}
+      {askBooked && (() => {
+        const who = me.careTeam.find((c) => c.member_id === askBooked);
+        if (!who) return null;
+        return (
+          <div className="mb-6 rounded-2xl border border-brand bg-white px-4 py-3">
+            <p className="font-semibold text-navy">{K.didYouBook(memberName(who, K.roles))}</p>
+            <p className="mb-3 text-sm text-muted">{K.didYouBookHelp}</p>
+            <div className="flex gap-4 text-sm font-semibold">
+              <button className="text-brand" onClick={() => {
+                setVisitForm({ ...emptyVisit(who.member_id), video: who.video }); setAskBooked(null);
+                setTimeout(() => document.getElementById("visit-form")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+              }}>{K.yesAddIt}</button>
+              <button className="text-muted" onClick={() => setAskBooked(null)}>{K.notYet}</button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* "Is this a visit?" for booking-email events we couldn't place */}
+      {suggestions.map((s) => (
+        <div key={s.eventId} className="mb-4 rounded-2xl border border-brand bg-white px-4 py-3">
+          <p className="font-semibold text-navy">{K.isThisVisit(s.name, fmtSlot(s.startsAt))}</p>
+          <p className="mb-3 text-sm text-muted">{K.isThisVisitHelp}</p>
+          <div className="flex flex-wrap gap-4 text-sm font-semibold">
+            {(["therapist", "psychiatrist", null] as const).map((role) => (
+              <button key={String(role)} disabled={busy} className={role ? "text-brand" : "text-muted"} onClick={async () => {
+                const r = await send("/api/visits/suggestions", "POST", { eventId: s.eventId, role });
+                if (r) setSuggestions((list) => list.filter((x) => x.eventId !== s.eventId));
+              }}>{role === "therapist" ? K.asTherapist : role === "psychiatrist" ? K.asPsychiatrist : K.notAVisit}</button>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {/* Medications */}
       <Section title={K.meds} action={!medForm && <button className={linkBtn} onClick={() => setMedForm({ m: emptyMed() })}><PlusIcon size={16} />{K.addMed}</button>}>
@@ -78,7 +131,7 @@ export default function CarePage() {
                   <p className="font-semibold text-navy">{m.label}</p>
                   <p className="text-sm text-muted">
                     {K.daysLeftShort(m.daysLeft)} · {K.runsOut(fmtShort(m.supplyEndDate))}
-                    {m.bookApptBy && !m.visitBooked ? ` · ${K.bookBy(fmtShort(m.bookApptBy))}` : ""}
+                    {m.bookApptBy && !m.visitBooked ? ` · ${visitLine(m, me.today, K, fmtShort)}` : ""}
                   </p>
                   {m.reminderTime && <p className="text-xs text-muted">{K.reminderAt(m.reminderTime)}</p>}
                 </div>
@@ -111,7 +164,8 @@ export default function CarePage() {
                   <p className="text-sm text-muted">{K.roles[c.role as keyof typeof K.roles] ?? c.role}{c.source_site && SITE_NAMES[c.source_site] ? ` · ${SITE_NAMES[c.source_site]}` : ""}{c.video ? ` · ${K.video}` : ""}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-4 text-sm">
-                  {c.booking_url && <a href={c.booking_url} target="_blank" rel="noopener noreferrer" className={linkBtn}>{K.book}<ExternalIcon size={14} /></a>}
+                  {c.booking_url && <a href={c.booking_url} target="_blank" rel="noopener noreferrer" className={linkBtn}
+                    onClick={() => { setAskBooked(null); setTimeout(() => setBookingWith(c.member_id), 300); }}>{K.book}<ExternalIcon size={14} /></a>}
                   {c.phone && <a href={`tel:${c.phone}`} className={linkBtn} aria-label={K.call}><PhoneIcon size={16} /></a>}
                   <button className="text-muted" disabled={busy} onClick={() => send(`/api/care-team?id=${c.member_id}`, "DELETE")}>{K.remove}</button>
                 </div>
@@ -124,17 +178,27 @@ export default function CarePage() {
             onSave={async (d) => { const ok = await send("/api/care-team", "POST", d); if (ok) setPersonForm(null); }} />
         )}
 
-        <div className="mt-4">
+        <div id="find" className="mt-4 scroll-mt-6">
           <p className="text-sm font-semibold text-navy">{K.find}</p>
           <p className="mb-2 text-xs text-muted">{K.findHelp}</p>
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <select aria-label={K.role} className={inputClass} value={findKind} onChange={(e) => setFindKind(e.target.value as "psychiatrist" | "therapist")}>
+              <option value="psychiatrist">{K.roles.psychiatrist}</option>
+              <option value="therapist">{K.roles.therapist}</option>
+            </select>
+            <select aria-label={C.profile.plan} className={inputClass} value={plan} onChange={(e) => setFindPlan(e.target.value)}>
+              {[...new Set([plan, ...PLANS])].filter(Boolean).map((p) => <option key={p}>{p}</option>)}
+            </select>
+          </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {find.map((f) => (
-              <a key={f.key} href={f.href} target="_blank" rel="noopener noreferrer" className={linkBtn}>
+              <a key={f.key} href={f.href} target="_blank" rel="noopener noreferrer" className={linkBtn}
+                title={f.filtered ? K.filteredBy(plan) : K.notFiltered}>
                 {K.findSites[f.key]}<ExternalIcon size={14} />
               </a>
             ))}
-            <Link href={`/providers?${new URLSearchParams({ plan: me.user.insurance_plan || "", type: "psychiatrist" })}`} className={linkBtn}>{K.findSites.continuity}</Link>
           </div>
+          <p className="mt-2 text-xs text-muted">{K.filterNote(find.filter((f) => f.filtered).map((f) => K.findSites[f.key]).join(", "), plan)}</p>
         </div>
       </Section>
 
@@ -147,7 +211,7 @@ export default function CarePage() {
               <li key={`${a.visit_id ?? "s" + a.slot_id}-${a.slot_start}`} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-navy">{a.provider_name}</p>
-                  <p className="text-sm text-muted">{fmtSlot(a.slot_start)}{a.recurring ? ` · ${K.recurring}` : ""}</p>
+                  <p className="text-sm text-muted">{fmtSlot(a.slot_start)}{a.recurring ? ` · ${K.recurring}` : ""}{a.imported ? ` · ${K.fromCalendar}` : ""}</p>
                 </div>
                 {a.visit_id && (
                   <button className="shrink-0 text-sm text-muted" disabled={busy} onClick={() => send(`/api/visits?id=${a.visit_id}`, "DELETE")}>
@@ -217,7 +281,6 @@ function MedEditor({ draft, busy, onSave, onCancel }: { draft: MedDraft; busy: b
         <input type="checkbox" className="h-4 w-4 accent-[#5AA9D8]" checked={d.needsVisit} onChange={(e) => setD({ ...d, needsVisit: e.target.checked })} />
         {K.medNeedsVisit}
       </label>
-      {d.needsVisit && <Field label={K.medLead}><input className={inputClass} type="number" min={1} value={d.lead} onChange={(e) => setD({ ...d, lead: Number(e.target.value) })} /></Field>}
       <Field label={K.medReminder} help={K.medReminderHelp}><input className={inputClass} type="time" value={d.reminder} onChange={(e) => setD({ ...d, reminder: e.target.value })} /></Field>
       <Buttons busy={busy} onCancel={onCancel} />
     </form>
@@ -268,7 +331,7 @@ function VisitEditor({ draft, team, roles, busy, onSave, onCancel }:
   const K = useCopy().care;
   const [d, setD] = useState(draft);
   return (
-    <form className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={(e) => { e.preventDefault(); if (d.when) onSave(d); }}>
+    <form id="visit-form" className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={(e) => { e.preventDefault(); if (d.when) onSave(d); }}>
       <Field label={K.visitWith}>
         <select className={inputClass} value={d.memberId} onChange={(e) => setD({ ...d, memberId: Number(e.target.value) })}>
           {team.map((c) => <option key={c.member_id} value={c.member_id}>{memberName(c, roles)}</option>)}

@@ -58,3 +58,4 @@ google_event_id TEXT,
 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS visits_by_user ON visits (user_id, starts_at);
+

@@ -3,18 +3,25 @@ import { AutoSubscribe, defineAgent, llm, voice } from '@livekit/agents';
 import * as google from '@livekit/agents-plugin-google';
 import { z } from 'zod';
 import { runAgent } from './chert-rooms.mjs';
-import { greetOnBridgeReady } from './greet.mjs';
 import { startAvatar } from './avatar.mjs';
 import { instructions } from './persona.mjs'; // shared with iMessage
 
 // Gemini Live: one model that listens and speaks.
 const RealtimeModel = google.beta?.realtime?.RealtimeModel ?? google.realtime?.RealtimeModel;
 
-// Continuity's web app (local while testing, the Vercel URL for the demo) + the shared secret for /api/agent/*
+// Continuity's web app (local while testing, the Vercel URL when live) + the shared secret for /api/agent/*
 const API = (process.env.CONTINUITY_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 const AGENT_KEY = process.env.AGENT_API_KEY || '';
-// Who is calling. Chert doesn't tell us the caller's account yet, so the demo uses one user (Maya).
-const USER_ID = Number(process.env.CONTINUITY_USER_ID || 1);
+// Who is calling. Web calls (the "Talk to Continuity" button) carry the signed-in user's id in the job metadata.
+// A call without a signed-in user (none in the app today) only gets general help: no care plan, no saving visits.
+const FALLBACK_USER_ID = Number(process.env.CONTINUITY_USER_ID || 0) || null;
+function callInfo(ctx) {
+  try {
+    const m = JSON.parse(ctx.job?.metadata || '{}');
+    if (Number.isInteger(m.userId) && m.userId > 0) return { userId: m.userId, channel: m.channel || 'web', lang: LANG_NAMES[m.lang] ? m.lang : 'en', name: m.name || null };
+  } catch { /* not JSON: a Chert call */ }
+  return { userId: FALLBACK_USER_ID, channel: 'other', lang: null, name: null };
+}
 
 async function api(path, init = {}) {
   const res = await fetch(`${API}${path}`, {
@@ -33,44 +40,36 @@ const CLOSE_EVENT = voice.AgentSessionEventTypes?.Close ?? 'close';
 const STATE_EVENT = voice.AgentSessionEventTypes?.AgentStateChanged ?? 'agent_state_changed';
 const USER_STATE_EVENT = voice.AgentSessionEventTypes?.UserStateChanged ?? 'user_state_changed';
 // Used only after an automatic reconnect.
-const RESUME_NOTE = "\n\nNote: the audio connection just dropped for a moment and you reconnected in the middle of this call. Any appointment options you listed earlier are still valid by their option number.";
+const RESUME_NOTE = "\n\nNote: the audio connection just dropped for a moment and you reconnected in the middle of this call.";
 const RESUME_LINE = "Say one short sentence: 'Sorry, I lost you for a second. Could you say that again?' In Spanish if the caller was speaking Spanish.";
-// Ivy's script: ask the language first, in both languages.
-const greeting = "Speak softly and slowly, in a calm, low-key, friendly tone, like a quiet room. Don't start loudly or with excitement. Say exactly: 'Hi, I'm Continuity. Would you like to talk in English or in Spanish? Hola, soy Continuity. ¿Prefieres hablar en inglés o en español?' Then wait. When they choose, greet them by name in that language, say you're an AI assistant, not a doctor or a nurse, and ask what they'd like help with. If something is urgent in get_care_status, offer to start there.";
 
-// Tools are built per call so each call remembers the options it offered ("option 1" -> slot_id).
-function makeTools() {
-  let lastOptions = [];
+// Languages the app offers (codes match web/lib/copy.ts LANGS)
+const LANG_NAMES = { en: 'English', es: 'Spanish', zh: 'Mandarin Chinese' };
+
+// Web calls: the person already picked their language in the app. Hold to it for the whole call.
+function languageLock(lang) {
+  const name = LANG_NAMES[lang] || 'English';
+  const crisis = lang === 'zh'
+    ? "\n- Crisis lines: 988 counselors speak English and Spanish. For Mandarin, tell them to call 988 and say \"Mandarin\" to get a free interpreter (phone calls only, not texts). 911 also provides interpreters."
+    : '';
+  return `\n\nLanguage for this call (this overrides the Language section above)
+- The person chose ${name} in the Continuity app. Speak only ${name} for the entire call: greetings, questions, dates, numbers and safety lines.
+- Do not ask which language they want. Do not switch because of a single word, a name or an accent.
+- Switch only if they clearly ask you to (for example "can we talk in Spanish?"), then stay in the new language.${crisis}`;
+}
+
+const webGreeting = (lang) => lang === 'zh'
+  ? "用平静、温和、缓慢的语气说普通话。先不要调用任何工具：使用你已经拿到的照护状态。用对方的名字打招呼，说明你是 AI 助手，不是医生或护士，然后问对方需要什么帮助。如果有紧急的事，提出先处理那件事。"
+  : lang === 'es'
+  ? "Habla en voz baja y con calma. No llames a ninguna herramienta todavía: usa el estado de atención que ya tienes. Saluda por su nombre en español, di que eres una asistente de IA, no médica ni enfermera, y pregunta en qué le puedes ayudar. Si algo es urgente, ofrece empezar por ahí. Puede cambiar a inglés cuando quiera."
+  : "Speak softly and calmly. Don't call any tools yet: use the care status you already have. Greet them by name in English, say you're an AI assistant, not a doctor or a nurse, and ask what they'd like help with. If something is urgent, offer to start there. They can switch to Spanish any time.";
+
+function makeTools(USER_ID) {
   return {
     get_care_status: llm.tool({
       description: "Get the caller's care plan: days of medication left, when they must book their next psychiatry visit, therapy timing, and upcoming appointments.",
       parameters: z.object({}),
-      execute: async () => api(`/api/agent/status?userId=${USER_ID}`),
-    }),
-    find_appointments: llm.tool({
-      description: 'Find in-network openings before the caller\'s deadline, soonest first. Returns numbered options (1, 2, 3).',
-      parameters: z.object({
-        provider_type: z.enum(['psychiatrist', 'therapist']).describe('psychiatrist for medication visits, therapist for therapy'),
-        video_only: z.boolean().optional().describe('true if the caller only wants video visits'),
-        language: z.string().optional().describe('e.g. "Spanish" if they want a provider who speaks it'),
-        in_their_words: z.string().optional().describe('1 to 3 key words the caller used for who they want, in their own language, e.g. "counselor", "shrink", "ADHD", "terapeuta", "Dr. Park". Leave out if they only said therapist or psychiatrist.'),
-      }),
-      execute: async ({ provider_type, video_only, language, in_their_words }) => {
-        const qs = new URLSearchParams({ userId: String(USER_ID), type: provider_type });
-        if (video_only) qs.set('telehealth', '1');
-        if (language) qs.set('language', language);
-        if (in_their_words) qs.set('q', in_their_words);
-        const data = await api(`/api/agent/slots?${qs}`);
-        lastOptions = data.options || [];
-        return {
-          deadline: data.deadline,
-          note: data.note,
-          ...(data.searched_for ? { searched_for: data.searched_for, matched_their_words: data.matched_their_words } : {}),
-          options: lastOptions.map((o, i) => ({
-            option_number: i + 1, provider: o.provider, specialty: o.specialty, when: o.when, video_visit: o.video_visit, length_minutes: o.length_minutes, fits_your_calendar: o.fits_your_calendar,
-          })),
-        };
-      },
+      execute: async () => (USER_ID ? api(`/api/agent/status?userId=${USER_ID}`) : { signed_in: false, note: 'No care plan on this call. Offer general help and find_support.' }),
     }),
     find_support: llm.tool({
       description: "Find the best-fit help line for what the caller describes (Typesense search over a vetted list: 988, 911, Poison Control, Crisis Text Line, Trevor Project, Emory CAPS and on-call lines). Crisis-related needs always return 988 first.",
@@ -87,25 +86,23 @@ function makeTools() {
         };
       },
     }),
-    book_appointment: llm.tool({
-      description: 'Send an appointment request for one of the options from find_appointments (holds the time; the office confirms and checks coverage). Call this immediately when the caller agrees.',
-      parameters: z.object({ option_number: z.number().describe('1, 2 or 3, from find_appointments') }),
-      execute: async ({ option_number }) => {
-        const option = lastOptions[Number(option_number) - 1];
-        if (!option) return { booked: false, reason: 'unknown_option', hint: 'Call find_appointments first.' };
+    add_visit: llm.tool({
+      description: "Save a visit the caller says they already booked (with their therapist or psychiatrist, on Zocdoc, Grow, by phone, anywhere). It goes in the app and on their Google Calendar. Use today's date from get_care_status to turn \"Tuesday at 4\" into a date. Repeat back the day and time first, then call this when they say yes.",
+      parameters: z.object({
+        role: z.enum(['therapist', 'psychiatrist']).describe('therapist for therapy/counseling, psychiatrist for medication visits'),
+        who: z.string().optional().describe("the provider's name if they said it, e.g. \"Dr. Holt\""),
+        date: z.string().describe('YYYY-MM-DD'),
+        time: z.string().describe('24-hour HH:MM, Eastern time, e.g. "16:00"'),
+        length_minutes: z.number().optional().describe('only if they said; default 50'),
+        video: z.boolean().optional().describe('true for a video visit'),
+        repeat_every_weeks: z.number().optional().describe('1 for weekly, 2 for every two weeks; leave out for a one-time visit'),
+      }),
+      execute: async ({ role, who, date, time, length_minutes, video, repeat_every_weeks }) => {
+        if (!USER_ID) return { added: false, say: 'Say you can only save visits for people signed in to the Continuity app, and they can add it under My care.' };
         try {
-          const r = await api('/api/agent/book', { method: 'POST', body: JSON.stringify({ userId: USER_ID, slotId: option.slot_id }) });
-          if (r?.booked === false) {
-            return r.reason === 'taken' || r.reason === 'slot_taken'
-              ? { request_sent: false, reason: 'time_taken', say: 'Someone just took that time. Offer the next option.' }
-              : { request_sent: false, reason: r.reason || 'not_sent', say: "Say: I couldn't send that request. You haven't been charged. Want me to try again, or pick another time?" };
-          }
-          return { ...r, request_sent: true, provider: option.provider, when: option.when, say: 'Confirm the request is sent and the time is held; the office will confirm and check coverage.' };
-        } catch (e) {
-          const taken = String(e?.message || '').includes('409');
-          return taken
-            ? { request_sent: false, reason: 'time_taken', say: 'Someone just took that time. Offer the next option.' }
-            : { request_sent: false, reason: 'error', say: "Say: I couldn't send that request. You haven't been charged. Want me to try again, or pick another time?" };
+          return await api('/api/agent/visits', { method: 'POST', body: JSON.stringify({ userId: USER_ID, role, who, date, time, durationMin: length_minutes, video, repeatEveryWeeks: repeat_every_weeks }) });
+        } catch {
+          return { added: false, say: "Say you couldn't save it just now, and they can add it in the app under My care." };
         }
       },
     }),
@@ -115,13 +112,25 @@ function makeTools() {
 const agent = defineAgent({
   entry: async ctx => {
     await ctx.connect(undefined, AutoSubscribe.AUDIO_ONLY);
+    const call = callInfo(ctx);
+    const USER_ID = call.userId;
+    // Fetch the caller's status while waiting for the caller (no delay once they join), so the greeting needs no tool call (early tool calls trip Gemini's 1007)
+    let statusNote = '';
+    try {
+      if (!USER_ID) throw new Error('no signed-in user on this call');
+      const st = await api(`/api/agent/status?userId=${USER_ID}`, { signal: AbortSignal.timeout(4000) });
+      statusNote = `\n\nThe caller's care status, already fetched for you (use it for the greeting; call get_care_status only if they ask for an update later): ${JSON.stringify(st)}`;
+      console.log('[continuity] status prefetched for user', USER_ID);
+      if (!call.lang && LANG_NAMES[st?.preferred_language]) call.lang = st.preferred_language;
+    } catch (e) { console.warn('[continuity] could not prefetch status', e?.message || e); }
     // Join promptly, but wait for a caller before opening a paid model session.
     const caller = await ctx.waitForParticipant();
     const startedAt = Date.now();
-    const chertCallId = caller.identity.replace(/^chert-bridge-/, '');
+    const chertCallId = call.channel === 'web' ? `web-${ctx.room.name}` : caller.identity.replace(/^chert-bridge-/, '');
+    console.log(`[continuity] ${call.channel} call for user ${USER_ID}`);
 
     // Tools are made once per call, so "option 2" still means the same slot after a reconnect.
-    const tools = makeTools();
+    const tools = makeTools(USER_ID);
     const MAX_RECONNECTS = 3;
     let reconnects = 0;
     let shuttingDown = false;
@@ -216,9 +225,10 @@ const agent = defineAgent({
         }
       });
 
+      if (resumed) { try { ctx.room.unregisterByteStreamHandler('lk.agent.session'); } catch {} }
       await s.start({
         room: ctx.room,
-        agent: new voice.Agent({ instructions: resumed ? instructions + RESUME_NOTE : instructions, tools }),
+        agent: new voice.Agent({ instructions: instructions + statusNote + languageLock(call.lang) + (resumed ? RESUME_NOTE : ''), tools }),
         record: false,
         inputOptions: {
           participantIdentity: caller.identity,
@@ -254,9 +264,8 @@ const agent = defineAgent({
       console.warn('[avatar] could not publish video, continuing audio-only:', e?.message || e);
     }
     session = await openSession({ resumed: false });
-    // Greet once when Chert reports FaceTime is ready (the call ends if silent for 10 s after that).
-    const stopGreeting = greetOnBridgeReady(ctx.room, () => session.generateReply({ instructions: greeting }));
-    ctx.addShutdownCallback(async () => stopGreeting());
+    // The caller is connected and listening: greet right away, in the language they picked in the app
+    session.generateReply({ instructions: webGreeting(call.lang) });
   },
 });
 

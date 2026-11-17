@@ -8,7 +8,7 @@ const b64url = (v: object | Buffer) => (Buffer.isBuffer(v) ? v : Buffer.from(JSO
 export const livekitConfigured = () =>
   Boolean(process.env.LIVEKIT_URL && process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_API_SECRET);
 
-export function callToken(opts: { userId: number; name?: string | null; lang: "en" | "es"; agentName?: string; ttlSec?: number }) {
+export function callToken(opts: { userId: number; name?: string | null; lang: "en" | "es" | "zh"; agentName?: string; ttlSec?: number }) {
   const key = process.env.LIVEKIT_API_KEY!;
   const secret = process.env.LIVEKIT_API_SECRET!;
   const room = `continuity-web-${opts.userId}-${randomBytes(4).toString("hex")}`;

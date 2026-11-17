@@ -19,13 +19,13 @@ export type CareMember = {
 export type Me = {
   today: string;
   needsOnboarding: boolean;
-  user: { user_id: number; display_name: string | null; email: string | null; insurance_plan: string; care_type: string;
+  user: { user_id: number; display_name: string | null; email: string | null; auto_import_visits?: boolean; alert_email?: boolean; insurance_plan: string; care_type: string;
     home_lat: number | null; home_lng: number | null; home_zip: string | null; preferred_language: string | null };
   medication: MedTimeline | null; // the one that runs out first
   medications: MedTimeline[];
   therapy: null | { nextSessionBy: string; bookBy: string; status: "green" | "yellow" | "red"; nextAction: string; sessionBooked: boolean };
-  appointments: { slot_id: number | null; visit_id?: number; slot_start: string; duration_min: number; telehealth: boolean;
-    provider_name: string; provider_type: string; specialty: string | null; recurring?: boolean; source?: "continuity" | "care_team" }[];
+  appointments: { slot_id: null; visit_id?: number; slot_start: string; duration_min: number; telehealth: boolean;
+    provider_name: string; provider_type: string; specialty: string | null; recurring?: boolean; imported?: boolean; source?: "continuity" | "care_team" }[];
   careTeam: CareMember[];
 };
 
@@ -72,5 +72,17 @@ export const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
 export const isoDay = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
-export const providersHref = (plan: string, type: string, before?: string | null) =>
-  `/providers?${new URLSearchParams({ plan, type, ...(before ? { before } : {}) })}`;
+// The visit window for a medication that needs a visit: between today and the visit deadline, "by X, book now" once
+// it's within two weeks, or "you're out" once the supply has run out.
+export function visitLine(m: MedTimeline, today: string, X: { bookBy: (d: string) => string; bookNow: (d: string) => string; ranOut: string }, fmt: (d: string) => string) {
+  if (m.supplyEndDate <= today) return X.ranOut;
+  const visitBy = m.apptBy ?? m.supplyEndDate;
+  return m.bookApptBy && m.bookApptBy <= today ? X.bookNow(fmt(visitBy)) : X.bookBy(fmt(visitBy));
+}
+
+// Where "Find a time" goes: the booking link of your own psychiatrist/therapist if you have one,
+// otherwise My care → Find someone new (directories pre-filtered by your plan)
+export function bookingHref(me: Me, role: "psychiatrist" | "therapist") {
+  const member = me.careTeam.find((c) => c.role === role && c.booking_url);
+  return member ? { href: member.booking_url!, external: true } : { href: "/care#find", external: false };
+}

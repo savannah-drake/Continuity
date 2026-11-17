@@ -118,6 +118,31 @@ async function gcal(userId: number, path: string, init: RequestInit = {}) {
   return res.status === 204 ? {} : res.json();
 }
 
+// Upcoming events on the main calendar, for auto-import of booking confirmations (only when the user turned it on).
+// Recurring events come back as single instances (singleEvents). Callers must not store titles or details.
+export type CalEvent = {
+  id: string; recurringEventId?: string; status?: string; summary?: string; description?: string; location?: string;
+  organizer?: { email?: string }; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string };
+  source?: { title?: string; url?: string }; eventType?: string;
+};
+export async function listEvents(userId: number, from: Date, to: Date): Promise<CalEvent[] | null> {
+  const out: CalEvent[] = [];
+  let pageToken = "";
+  for (let page = 0; page < 5; page++) {
+    const qs = new URLSearchParams({
+      timeMin: from.toISOString(), timeMax: to.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "250",
+      fields: "nextPageToken,items(id,recurringEventId,status,summary,description,location,organizer(email),start,end,source,eventType)",
+      ...(pageToken ? { pageToken } : {}),
+    });
+    const data = await gcal(userId, `/calendars/primary/events?${qs}`);
+    if (!data) return null;
+    out.push(...((data.items ?? []) as CalEvent[]));
+    if (!data.nextPageToken) break;
+    pageToken = data.nextPageToken;
+  }
+  return out;
+}
+
 // Busy start/end times on the user's main calendar (no titles or details)
 export async function freeBusy(userId: number, from: Date, to: Date) {
   const data = await gcal(userId, "/freeBusy", {

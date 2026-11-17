@@ -32,6 +32,17 @@ const T = {
     note: "Continuity es un asistente de IA, no un profesional médico. En una crisis, llama o escribe al 988.",
     help: "Pregunta por tus resurtidos, busca un horario que te funcione o pide apoyo.",
   },
+  zh: {
+    title: "和 Continuity 说话", start: "开始通话", connecting: "正在连接…", ended: "通话已结束",
+    listening: "正在听", thinking: "正在想", speaking: "正在说", waiting: "正在加入…",
+    mute: "静音", unmute: "取消静音", end: "挂断", again: "再打一次", home: "返回首页",
+    micBlocked: "浏览器阻止了麦克风。请在地址栏允许麦克风，然后重新开始。",
+    failed: "通话无法连接，请稍后再试。",
+    notConfigured: "这个服务器还没有设置通话功能。",
+    signIn: "登录后才能和 Continuity 说话。",
+    note: "Continuity 是 AI 助手，不是医疗专业人员。如果处于危机中，请拨打 988，可以要求普通话翻译。",
+    help: "可以问续药的事、找适合你的时间，或寻求支持。",
+  },
 } as const;
 
 type Phase = "idle" | "connecting" | "live" | "ended" | "error";
