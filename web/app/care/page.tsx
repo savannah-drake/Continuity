@@ -47,10 +47,14 @@ export default function CarePage() {
   const [askBooked, setAskBooked] = useState<number | null>(null);
   const [pharmForm, setPharmForm] = useState<null | { id?: number; name: string; phone: string; address: string }>(null);
   // Pharmacy search near your ZIP (CMS NPI Registry)
-  const [pharmSearch, setPharmSearch] = useState<null | { zip: string; q: string; loading: boolean; results: { npi: string; name: string; address: string; phone: string | null }[] }>(null);
-  async function searchPharmacies(zip?: string) {
-    setPharmSearch((s) => ({ zip: zip ?? s?.zip ?? "", q: s?.q ?? "", loading: true, results: s?.results ?? [] }));
-    const d = await fetch(`/api/pharmacies/search${zip ? `?zip=${zip}` : ""}`).then((r) => r.json()).catch(() => ({ pharmacies: [] }));
+  const [pharmSearch, setPharmSearch] = useState<null | { zip: string; q: string; loading: boolean; results: { npi: string; name: string; address: string; phone: string | null; miles?: number }[] }>(null);
+  const [pharmTimer, setPharmTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  async function searchPharmacies(zip?: string, q?: string) {
+    setPharmSearch((s) => ({ zip: zip ?? s?.zip ?? "", q: q ?? s?.q ?? "", loading: true, results: s?.results ?? [] }));
+    const params = new URLSearchParams();
+    if (zip) params.set("zip", zip);
+    if (q) params.set("q", q);
+    const d = await fetch(`/api/pharmacies/search?${params}`).then((r) => r.json()).catch(() => ({ pharmacies: [] }));
     setPharmSearch((s) => ({ zip: d.zip ?? zip ?? "", q: s?.q ?? "", loading: false, results: d.pharmacies ?? [] }));
   }
   const [personEdit, setPersonEdit] = useState<null | { id: number; d: PersonDraft }>(null);
@@ -231,23 +235,27 @@ export default function CarePage() {
           <div className="mt-3 rounded-2xl border border-line bg-white p-4">
             <div className="mb-3 grid grid-cols-[1fr_7rem] gap-2">
               <input className={inputClass} aria-label={K.pharmacyFilter} placeholder={K.pharmacyFilter} value={pharmSearch.q}
-                onChange={(e) => setPharmSearch({ ...pharmSearch, q: e.target.value })} />
+                onChange={(e) => {
+                  const q = e.target.value;
+                  setPharmSearch({ ...pharmSearch, q });
+                  if (pharmTimer) clearTimeout(pharmTimer);
+                  setPharmTimer(setTimeout(() => searchPharmacies(pharmSearch.zip || undefined, q), 300));
+                }} />
               <input className={inputClass} aria-label={K.pharmacyZip} inputMode="numeric" maxLength={5} placeholder="ZIP" value={pharmSearch.zip}
-                onChange={(e) => { const z = e.target.value.replace(/\D/g, "").slice(0, 5); setPharmSearch({ ...pharmSearch, zip: z }); if (z.length === 5) searchPharmacies(z); }} />
+                onChange={(e) => { const z = e.target.value.replace(/\D/g, "").slice(0, 5); setPharmSearch({ ...pharmSearch, zip: z }); if (z.length === 5) searchPharmacies(z, pharmSearch.q); }} />
             </div>
             {pharmSearch.loading ? <p className="text-sm text-muted">{K.pharmacySearching}</p> : (() => {
-              const q = pharmSearch.q.trim().toLowerCase();
-              const list = pharmSearch.results.filter((p) => !q || p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
+              const list = pharmSearch.results;
               const saved = new Set(me.pharmacies.map((p) => p.pharmacy_name.toLowerCase() + "|" + (p.address ?? "").toLowerCase()));
               return list.length === 0 ? <p className="text-sm text-muted">{K.pharmacyNone(pharmSearch.zip)}</p> : (
                 <>
-                  <p className="mb-2 text-xs text-muted">{K.pharmacyNear(pharmSearch.zip)}</p>
+                  <p className="mb-2 text-xs text-muted">{pharmSearch.zip ? K.pharmacyNear(pharmSearch.zip) : K.pharmacyNearYou}</p>
                   <ul className="max-h-80 divide-y divide-line overflow-y-auto">
                     {list.map((p) => (
                       <li key={p.npi} className="flex items-center gap-3 py-2.5">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-navy">{p.name}</p>
-                          <p className="truncate text-xs text-muted">{p.address}{p.phone ? ` · ${p.phone}` : ""}</p>
+                          <p className="truncate text-xs text-muted">{p.miles != null ? `${p.miles} mi · ` : ""}{p.address}{p.phone ? ` · ${p.phone}` : ""}</p>
                         </div>
                         {saved.has(p.name.toLowerCase() + "|" + p.address.toLowerCase())
                           ? <span className="shrink-0 text-xs text-muted">{K.pharmacyAdded}</span>
