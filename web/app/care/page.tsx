@@ -7,29 +7,25 @@ import Link from "next/link";
 import { useCopy } from "@/lib/i18n";
 import { useMe, visitLine, fmtShort, fmtSlot, type MedTimeline, type CareMember, type Pharmacy } from "@/lib/useMe";
 import { SuggestInput } from "@/components/Suggest";
-import { Screen, Field, inputClass, BottomNav } from "@/components/ui";
+import { Screen, Field, inputClass, BottomNav, DisplayTitle, SectionTitle, Scallop, MascotPeek, Avatar, statusTone, toneBg, inkBtn, outlineBtn, smallInkBtn, smallOutlineBtn, quietBtn, roundBtn } from "@/components/ui";
 import { ExternalIcon, PhoneIcon, PlusIcon } from "@/components/icons";
 import { findLinks } from "@/lib/findLinks";
 import { PLANS } from "@/lib/copy";
 
 const SITE_NAMES: Record<string, string> = { zocdoc: "Zocdoc", grow: "Grow Therapy", psychologytoday: "Psychology Today", therapyden: "TherapyDen", timelycare: "TimelyCare" };
 
-const dot = (status: string) => (status === "red" ? "bg-coral" : status === "yellow" ? "bg-attn" : "bg-live");
-
 function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="mb-8">
-      <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-[15px] font-bold text-navy">{title}</h2>
-        {action}
-      </div>
+    <section className="mb-9">
+      <SectionTitle action={action}>{title}</SectionTitle>
       {children}
     </section>
   );
 }
 
-const linkBtn = "inline-flex items-center gap-1 text-sm font-semibold text-brand";
-const rowList = "divide-y divide-line rounded-2xl border border-line bg-white";
+const linkBtn = smallOutlineBtn;
+const rowList = "divide-y divide-line overflow-hidden rounded-[30px] bg-white";
+const promptCard = "mb-5 rounded-[30px] bg-white p-5";
 
 export default function CarePage() {
   const C = useCopy();
@@ -84,7 +80,7 @@ export default function CarePage() {
 
   if (state === "loading") return <Screen nav><p className="text-muted">{C.booking.loading}</p><BottomNav active="care" /></Screen>;
   if (state !== "ready" || !me) {
-    return <Screen nav><p className="text-muted">{C.auth.signedOutNote}</p><Link href="/" className={`${linkBtn} mt-3`}>{C.auth.google}</Link><BottomNav active="care" /></Screen>;
+    return <Screen nav><p className="text-muted">{C.auth.signedOutNote}</p><Link href="/" className={`${smallInkBtn} mt-3`}>{C.auth.google}</Link><BottomNav active="care" /></Screen>;
   }
 
   async function send(url: string, method: string, body?: unknown) {
@@ -102,24 +98,26 @@ export default function CarePage() {
 
   return (
     <Screen nav>
-      <h1 className="text-[26px] font-bold text-navy">{K.title}</h1>
-      <p className="mb-6 text-sm text-muted">{K.sub}</p>
-      {note && <p className="mb-4 text-sm text-navy" role="status">{note}</p>}
+      <div className="mb-7 text-center">
+        <DisplayTitle text={K.title} />
+        <p className="mx-auto mt-2 max-w-[280px] text-[15px] leading-relaxed text-muted">{K.sub}</p>
+      </div>
+      {note && <p className="mb-5 rounded-2xl bg-mint px-4 py-3 text-sm font-semibold text-navy" role="status">{note}</p>}
 
       {/* Back from the booking site: save the visit they just booked */}
       {askBooked && (() => {
         const who = me.careTeam.find((c) => c.member_id === askBooked);
         if (!who) return null;
         return (
-          <div className="mb-6 rounded-2xl border border-brand bg-white px-4 py-3">
-            <p className="font-semibold text-navy">{K.didYouBook(memberName(who, K.roles))}</p>
+          <div className={promptCard}>
+            <p className="text-[16px] font-bold text-navy">{K.didYouBook(memberName(who, K.roles))}</p>
             <p className="mb-3 text-sm text-muted">{K.didYouBookHelp}</p>
-            <div className="flex gap-4 text-sm font-semibold">
-              <button className="text-brand" onClick={() => {
+            <div className="flex flex-wrap gap-2.5">
+              <button className={smallInkBtn} onClick={() => {
                 setVisitForm({ ...emptyVisit(who.member_id), video: who.video }); setAskBooked(null);
                 setTimeout(() => document.getElementById("visit-form")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
               }}>{K.yesAddIt}</button>
-              <button className="text-muted" onClick={() => setAskBooked(null)}>{K.notYet}</button>
+              <button className={smallOutlineBtn} onClick={() => setAskBooked(null)}>{K.notYet}</button>
             </div>
           </div>
         );
@@ -127,12 +125,12 @@ export default function CarePage() {
 
       {/* "Is this a visit?" for booking-email events we couldn't place */}
       {suggestions.map((s) => (
-        <div key={s.eventId} className="mb-4 rounded-2xl border border-brand bg-white px-4 py-3">
-          <p className="font-semibold text-navy">{K.isThisVisit(s.name, fmtSlot(s.startsAt))}</p>
+        <div key={s.eventId} className={promptCard}>
+          <p className="text-[16px] font-bold text-navy">{K.isThisVisit(s.name, fmtSlot(s.startsAt))}</p>
           <p className="mb-3 text-sm text-muted">{K.isThisVisitHelp}</p>
-          <div className="flex flex-wrap gap-4 text-sm font-semibold">
+          <div className="flex flex-wrap gap-2.5">
             {(["therapist", "psychiatrist", null] as const).map((role) => (
-              <button key={String(role)} disabled={busy} className={role ? "text-brand" : "text-muted"} onClick={async () => {
+              <button key={String(role)} disabled={busy} className={role ? smallInkBtn : smallOutlineBtn} onClick={async () => {
                 const r = await send("/api/visits/suggestions", "POST", { eventId: s.eventId, role });
                 if (r) setSuggestions((list) => list.filter((x) => x.eventId !== s.eventId));
               }}>{role === "therapist" ? K.asTherapist : role === "psychiatrist" ? K.asPsychiatrist : K.notAVisit}</button>
@@ -148,35 +146,39 @@ export default function CarePage() {
         const office = me.careTeam.find((c) => c.role === "psychiatrist" && c.phone && (!pv.who || c.provider_name === pv.who)) ?? me.careTeam.find((c) => c.role === "psychiatrist" && c.phone);
         const soonest = me.medications[0];
         return (
-          <div className="mb-6 rounded-2xl border border-brand bg-white px-4 py-3">
-            <p className="font-semibold text-navy">{K.afterVisitQ(pv.who)}</p>
+          <div className="mb-5">
+          <MascotPeek>
+          <div className="rounded-[30px] bg-white p-5">
+            <p className="pr-16 text-[16px] font-bold text-navy">{K.afterVisitQ(pv.who)}</p>
             {!rxNotYet ? (
-              <div className="mt-3 flex gap-4 text-sm font-semibold">
-                <button className="text-brand" disabled={busy} onClick={async () => { if (await send("/api/medications/rx-sent", "POST")) setHidden((h) => [...h, "rx"]); }}>{K.yesSent}</button>
-                <button className="text-muted" onClick={() => setRxNotYet(true)}>{K.notSent}</button>
+              <div className="mt-3 flex flex-wrap gap-2.5">
+                <button className={smallInkBtn} disabled={busy} onClick={async () => { if (await send("/api/medications/rx-sent", "POST")) setHidden((h) => [...h, "rx"]); }}>{K.yesSent}</button>
+                <button className={smallOutlineBtn} onClick={() => setRxNotYet(true)}>{K.notSent}</button>
               </div>
             ) : (
               <div className="mt-2 text-sm">
                 <p className="font-semibold text-navy">{K.callScriptTitle}</p>
-                <p className="mb-3 text-muted">{K.callScript(fmtShort(pv.date), fmtShort(soonest.supplyEndDate))}</p>
-                <div className="flex gap-4 font-semibold">
-                  {office?.phone && <a href={`tel:${office.phone}`} className={linkBtn}><PhoneIcon size={16} />{K.callOffice}</a>}
-                  <button className="text-muted" onClick={() => setHidden((h) => [...h, "rx"])}>{K.cancel}</button>
+                <p className="mb-3 rounded-2xl bg-mist p-3 text-navy">{K.callScript(fmtShort(pv.date), fmtShort(soonest.supplyEndDate))}</p>
+                <div className="flex flex-wrap gap-2.5">
+                  {office?.phone && <a href={`tel:${office.phone}`} className={smallInkBtn}><PhoneIcon size={16} />{K.callOffice}</a>}
+                  <button className={quietBtn} onClick={() => setHidden((h) => [...h, "rx"])}>{K.cancel}</button>
                 </div>
               </div>
             )}
+          </div>
+          </MascotPeek>
           </div>
         );
       })()}
 
       {/* Run-out day: did you pick up the refill? */}
       {me.medications.filter((m) => !hidden.includes(`pickup${m.medicationId}`) && (pickupFor === m.medicationId || (m.daysLeft <= 1 && !(m.bookApptBy && !m.visitBooked) && !(m.requestRxBy && !m.rxSentOn)))).map((m) => (
-        <div key={`pickup${m.medicationId}`} className="mb-4 rounded-2xl border border-brand bg-white px-4 py-3">
-          <p className="font-semibold text-navy">{K.didPickUp(m.label)}</p>
-          <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
-            <button className="text-brand" disabled={busy} onClick={async () => { if (await send("/api/medications/refilled", "POST", { medicationId: m.medicationId })) { setHidden((h) => [...h, `pickup${m.medicationId}`]); setNote(K.pickedUpDone); } }}>{K.yesPickedUp}</button>
+        <div key={`pickup${m.medicationId}`} className={promptCard}>
+          <p className="text-[16px] font-bold text-navy">{K.didPickUp(m.label)}</p>
+          <div className="mt-3 flex flex-wrap gap-2.5">
+            <button className={smallInkBtn} disabled={busy} onClick={async () => { if (await send("/api/medications/refilled", "POST", { medicationId: m.medicationId })) { setHidden((h) => [...h, `pickup${m.medicationId}`]); setNote(K.pickedUpDone); } }}>{K.yesPickedUp}</button>
             {m.pharmacy?.phone && <a href={`tel:${m.pharmacy.phone}`} className={linkBtn}><PhoneIcon size={16} />{K.callPharmacy(m.pharmacy.name)}</a>}
-            <button className="text-muted" onClick={() => setHidden((h) => [...h, `pickup${m.medicationId}`])}>{K.notYet}</button>
+            <button className={smallOutlineBtn} onClick={() => setHidden((h) => [...h, `pickup${m.medicationId}`])}>{K.notYet}</button>
           </div>
         </div>
       ))}
@@ -185,39 +187,50 @@ export default function CarePage() {
       <Section title={K.meds} action={!medForm && <button className={linkBtn} onClick={() => setMedForm({ m: emptyMed() })}><PlusIcon size={16} />{K.addMed}</button>}>
         {me.medications.length === 0 && !medForm && <p className="text-sm text-muted">{K.medsEmpty}</p>}
         {me.medications.length > 0 && (
-          <ul className={rowList}>
-            {me.medications.map((m) => (
-              <li key={m.medicationId} className="flex items-start gap-3 px-4 py-3">
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot(m.status)}`} aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-navy">{m.label}</p>
-                  <p className="text-sm text-muted">
-                    {K.daysLeftShort(m.daysLeft)} · {K.runsOut(fmtShort(m.supplyEndDate))}
-                    {m.rxSentOn ? ` · ${K.rxSentLine(m.pharmacy?.name ?? null)}`
-                      : m.bookApptBy && !m.visitBooked ? ` · ${visitLine(m, me.today, K, fmtShort)}`
-                      : m.requestRxBy && m.nextAction === "request_rx" ? ` · ${K.requestRxBy(fmtShort(m.requestRxBy))}` : ""}
-                  </p>
-                  {m.pharmacy && (
-                    <p className="text-xs text-muted">{K.medPharmacy}: {m.pharmacy.name}
-                      {m.pharmacy.phone && <a href={`tel:${m.pharmacy.phone}`} className="ml-2 font-semibold text-brand" aria-label={K.callPharmacy(m.pharmacy.name)}>{K.call}</a>}
-                      {/* An online refill only works when there's a refill left (never for controlled medications) */}
-                      {m.pharmacy.refillUrl && !m.controlled && (m.refillsRemaining > 0 || !!m.rxSentOn) && (
-                        <a href={m.pharmacy.refillUrl} target="_blank" rel="noopener noreferrer" className="ml-2 font-semibold text-brand">{K.refillOnline}</a>
-                      )}
+          <div className="flex flex-col gap-3">
+            {me.medications.map((m) => {
+              const tone = statusTone(m.status);
+              return (
+              <div key={m.medicationId} className={`flex flex-col gap-3.5 rounded-[30px] p-5 ${toneBg[tone]}`}>
+                <div className="flex items-center gap-3.5">
+                  <Scallop size={76} tone={tone === "rose" ? "butter" : "white"}>
+                    <p className="font-display text-[28px] font-bold leading-none text-navy">{Math.max(0, m.daysLeft)}</p>
+                    <p className="text-[11px] font-bold text-navy">{C.home.daysLeftBadge}</p>
+                  </Scallop>
+                  <div className="min-w-0 flex-1">
+                    {m.status === "red" && <span className="mb-1.5 inline-block rounded-full bg-navy px-2.5 py-0.5 text-[11px] font-bold text-white">{C.home.urgent}</span>}
+                    <p className="font-display text-[23px] font-semibold leading-tight text-navy">{m.label}</p>
+                    <p className="mt-1 text-[13px] leading-snug text-navy/80">
+                      {K.runsOut(fmtShort(m.supplyEndDate))}
+                      {m.rxSentOn ? ` · ${K.rxSentLine(m.pharmacy?.name ?? null)}`
+                        : m.bookApptBy && !m.visitBooked ? ` · ${visitLine(m, me.today, K, fmtShort)}`
+                        : m.requestRxBy && m.nextAction === "request_rx" ? ` · ${K.requestRxBy(fmtShort(m.requestRxBy))}` : ""}
                     </p>
-                  )}
-                  {m.controlled && <p className="text-xs text-muted">{K.controlledNote}</p>}
-                  {m.reminderTime && <p className="text-xs text-muted">{K.reminderAt(m.reminderTime)}</p>}
-                  <button className="mt-1 text-xs font-semibold text-brand" disabled={busy}
+                  </div>
+                </div>
+                {m.controlled && <p className="rounded-2xl bg-white/55 px-3.5 py-3 text-[13px] leading-relaxed text-navy">{K.controlledNote}</p>}
+                {(m.pharmacy || m.reminderTime) && (
+                  <p className="text-[13px] text-navy/75">
+                    {m.pharmacy && <>{K.medPharmacy}: {m.pharmacy.name}</>}
+                    {m.pharmacy && m.reminderTime && " · "}
+                    {m.reminderTime && K.reminderAt(m.reminderTime)}
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <button className={smallInkBtn} disabled={busy}
                     onClick={async () => { if (await send("/api/medications/refilled", "POST", { medicationId: m.medicationId })) setNote(K.pickedUpDone); }}>{K.pickedUp}</button>
+                  {m.pharmacy?.phone && <a href={`tel:${m.pharmacy.phone}`} className={smallOutlineBtn} aria-label={K.callPharmacy(m.pharmacy.name)}><PhoneIcon size={15} />{K.call}</a>}
+                  {/* An online refill only works when there's a refill left (never for controlled medications) */}
+                  {m.pharmacy?.refillUrl && !m.controlled && (m.refillsRemaining > 0 || !!m.rxSentOn) && (
+                    <a href={m.pharmacy.refillUrl} target="_blank" rel="noopener noreferrer" className={smallOutlineBtn}>{K.refillOnline}<ExternalIcon size={13} /></a>
+                  )}
+                  <button className={smallOutlineBtn} onClick={() => setMedForm({ id: m.medicationId, m: medToDraft(m) })}>{K.editMed}</button>
+                  <button className={quietBtn} disabled={busy} onClick={() => send(`/api/medications?id=${m.medicationId}`, "DELETE")}>{K.removeMed}</button>
                 </div>
-                <div className="flex shrink-0 gap-3 text-sm">
-                  <button className="font-semibold text-brand" onClick={() => setMedForm({ id: m.medicationId, m: medToDraft(m) })}>{K.editMed}</button>
-                  <button className="text-muted" disabled={busy} onClick={() => send(`/api/medications?id=${m.medicationId}`, "DELETE")}>{K.removeMed}</button>
-                </div>
-              </li>
-            ))}
-          </ul>
+              </div>
+              );
+            })}
+          </div>
         )}
         {medForm && (
           <MedEditor draft={medForm.m} pharmacies={me.pharmacies} busy={busy} onCancel={() => setMedForm(null)}
@@ -232,7 +245,7 @@ export default function CarePage() {
       <Section title={K.pharmacies} action={!pharmForm && !pharmSearch && <button className={linkBtn} onClick={() => searchPharmacies()}><PlusIcon size={16} />{K.addPharmacy}</button>}>
         {me.pharmacies.length === 0 && !pharmForm && !pharmSearch && <p className="text-sm text-muted">{K.pharmaciesEmpty}</p>}
         {pharmSearch && (
-          <div className="mt-3 rounded-2xl border border-line bg-white p-4">
+          <div className="mt-3 rounded-[30px] bg-white p-5">
             <div className="mb-3 grid grid-cols-[1fr_7rem] gap-2">
               <input className={inputClass} aria-label={K.pharmacyFilter} placeholder={K.pharmacyFilter} value={pharmSearch.q}
                 onChange={(e) => {
@@ -259,7 +272,7 @@ export default function CarePage() {
                         </div>
                         {saved.has(p.name.toLowerCase() + "|" + p.address.toLowerCase())
                           ? <span className="shrink-0 text-xs text-muted">{K.pharmacyAdded}</span>
-                          : <button className="shrink-0 text-sm font-semibold text-brand" disabled={busy}
+                          : <button className={`${smallInkBtn} shrink-0`} disabled={busy}
                               onClick={() => send("/api/pharmacies", "POST", { name: p.name, phone: p.phone, address: p.address })}>{K.addPharmacy}</button>}
                       </li>
                     ))}
@@ -267,9 +280,9 @@ export default function CarePage() {
                 </>
               );
             })()}
-            <div className="mt-3 flex gap-5 text-sm font-semibold">
-              <button className="text-brand" onClick={() => { setPharmSearch(null); setPharmForm({ name: "", phone: "", address: "" }); }}>{K.pharmacyManual}</button>
-              <button className="text-muted" onClick={() => setPharmSearch(null)}>{K.done}</button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button className={smallOutlineBtn} onClick={() => { setPharmSearch(null); setPharmForm({ name: "", phone: "", address: "" }); }}>{K.pharmacyManual}</button>
+              <button className={smallInkBtn} onClick={() => setPharmSearch(null)}>{K.done}</button>
             </div>
             <p className="mt-2 text-[11px] text-muted">{K.pharmacySource}</p>
           </div>
@@ -279,21 +292,21 @@ export default function CarePage() {
             {me.pharmacies.map((p) => (
               <li key={p.pharmacy_id} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-navy">{p.pharmacy_name}{p.preferred && <span className="ml-2 text-xs font-normal text-muted">{K.preferred}</span>}</p>
+                  <p className="truncate font-semibold text-navy">{p.pharmacy_name}{p.preferred && <span className="ml-2 rounded-full bg-mint px-2 py-0.5 text-[11px] font-bold text-navy">{K.preferred}</span>}</p>
                   {p.address && <p className="truncate text-sm text-muted">{p.address}</p>}
                 </div>
-                <div className="flex shrink-0 items-center gap-4 text-sm">
-                  {p.phone && <a href={`tel:${p.phone}`} className={linkBtn} aria-label={K.callPharmacy(p.pharmacy_name)}><PhoneIcon size={16} /></a>}
-                  {!p.preferred && <button className="font-semibold text-brand" disabled={busy} onClick={() => send("/api/pharmacies", "PATCH", { pharmacyId: p.pharmacy_id, preferred: true })}>{K.makePreferred}</button>}
-                  <button className="font-semibold text-brand" onClick={() => { setPharmSearch(null); setPharmForm({ id: p.pharmacy_id, name: p.pharmacy_name, phone: p.phone ?? "", address: p.address ?? "" }); }}>{K.edit}</button>
-                  <button className="text-muted" disabled={busy} onClick={() => send(`/api/pharmacies?id=${p.pharmacy_id}`, "DELETE")}>{K.remove}</button>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  {p.phone && <a href={`tel:${p.phone}`} className={roundBtn} aria-label={K.callPharmacy(p.pharmacy_name)}><PhoneIcon size={17} /></a>}
+                  {!p.preferred && <button className={smallOutlineBtn} disabled={busy} onClick={() => send("/api/pharmacies", "PATCH", { pharmacyId: p.pharmacy_id, preferred: true })}>{K.makePreferred}</button>}
+                  <button className={smallOutlineBtn} onClick={() => { setPharmSearch(null); setPharmForm({ id: p.pharmacy_id, name: p.pharmacy_name, phone: p.phone ?? "", address: p.address ?? "" }); }}>{K.edit}</button>
+                  <button className={quietBtn} disabled={busy} onClick={() => send(`/api/pharmacies?id=${p.pharmacy_id}`, "DELETE")}>{K.remove}</button>
                 </div>
               </li>
             ))}
           </ul>
         )}
         {pharmForm && (
-          <form className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={async (e) => {
+          <form className="mt-3 space-y-4 rounded-[30px] bg-white p-5" onSubmit={async (e) => {
             e.preventDefault();
             if (!pharmForm.name.trim()) return;
             const ok = pharmForm.id
@@ -315,17 +328,18 @@ export default function CarePage() {
         {me.careTeam.length > 0 && (
           <ul className={rowList}>
             {me.careTeam.map((c) => (
-              <li key={c.member_id} className="flex items-center gap-3 px-4 py-3">
+              <li key={c.member_id} className="flex items-center gap-3 px-4 py-3.5">
+                <Avatar name={memberName(c, K.roles)} role={c.role} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-navy">{memberName(c, K.roles)}</p>
+                  <p className="truncate text-[15px] font-bold text-navy">{memberName(c, K.roles)}</p>
                   <p className="text-sm text-muted">{K.roles[c.role as keyof typeof K.roles] ?? c.role}{c.source_site && SITE_NAMES[c.source_site] ? ` · ${SITE_NAMES[c.source_site]}` : ""}{c.video ? ` · ${K.video}` : ""}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-4 text-sm">
-                  {c.booking_url && <a href={c.booking_url} target="_blank" rel="noopener noreferrer" className={linkBtn}
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  {c.booking_url && <a href={c.booking_url} target="_blank" rel="noopener noreferrer" className={smallInkBtn}
                     onClick={() => { setAskBooked(null); setTimeout(() => setBookingWith(c.member_id), 300); }}>{K.book}<ExternalIcon size={14} /></a>}
-                  {c.phone && <a href={`tel:${c.phone}`} className={linkBtn} aria-label={K.call}><PhoneIcon size={16} /></a>}
-                  <button className="font-semibold text-brand" onClick={() => setPersonEdit({ id: c.member_id, d: { bookingUrl: c.booking_url ?? "", role: (c.role as PersonDraft["role"]) ?? "other", providerName: c.provider_name ?? "", phone: c.phone ?? "", video: c.video } })}>{K.edit}</button>
-                  <button className="text-muted" disabled={busy} onClick={() => send(`/api/care-team?id=${c.member_id}`, "DELETE")}>{K.remove}</button>
+                  {c.phone && <a href={`tel:${c.phone}`} className={roundBtn} aria-label={K.call}><PhoneIcon size={17} /></a>}
+                  <button className={smallOutlineBtn} onClick={() => setPersonEdit({ id: c.member_id, d: { bookingUrl: c.booking_url ?? "", role: (c.role as PersonDraft["role"]) ?? "other", providerName: c.provider_name ?? "", phone: c.phone ?? "", video: c.video } })}>{K.edit}</button>
+                  <button className={quietBtn} disabled={busy} onClick={() => send(`/api/care-team?id=${c.member_id}`, "DELETE")}>{K.remove}</button>
                 </div>
               </li>
             ))}
@@ -340,9 +354,9 @@ export default function CarePage() {
             onSave={async (d) => { const ok = await send("/api/care-team", "POST", d); if (ok) setPersonForm(null); }} />
         )}
 
-        <div id="find" className="mt-4 scroll-mt-6">
-          <p className="text-sm font-semibold text-navy">{K.find}</p>
-          <p className="mb-2 text-xs text-muted">{K.findHelp}</p>
+        <div id="find" className="mt-5 scroll-mt-6 rounded-[30px] bg-lavender p-5">
+          <p className="font-display text-[20px] font-semibold text-navy">{K.find}</p>
+          <p className="mb-3 text-[13px] text-navy/75">{K.findHelp}</p>
           <div className="mb-3 grid grid-cols-2 gap-2">
             <select aria-label={K.role} className={inputClass} value={findKind} onChange={(e) => setFindKind(e.target.value as "psychiatrist" | "therapist")}>
               <option value="psychiatrist">{K.roles.psychiatrist}</option>
@@ -352,7 +366,7 @@ export default function CarePage() {
               {[...new Set([plan, ...PLANS])].filter(Boolean).map((p) => <option key={p}>{p}</option>)}
             </select>
           </div>
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <div className="flex flex-wrap gap-2">
             {find.map((f) => (
               <a key={f.key} href={f.href} target="_blank" rel="noopener noreferrer" className={linkBtn}
                 title={f.filtered ? K.filteredBy(plan) : K.notFiltered}>
@@ -360,7 +374,7 @@ export default function CarePage() {
               </a>
             ))}
           </div>
-          <p className="mt-2 text-xs text-muted">{K.filterNote(find.filter((f) => f.filtered).map((f) => K.findSites[f.key]).join(", "), plan)}</p>
+          <p className="mt-3 text-xs text-navy/70">{K.filterNote(find.filter((f) => f.filtered).map((f) => K.findSites[f.key]).join(", "), plan)}</p>
         </div>
       </Section>
 
@@ -370,13 +384,14 @@ export default function CarePage() {
         {me.appointments.length > 0 && (
           <ul className={rowList}>
             {me.appointments.map((a) => (
-              <li key={`${a.visit_id ?? "s" + a.slot_id}-${a.slot_start}`} className="flex items-center gap-3 px-4 py-3">
+              <li key={`${a.visit_id ?? "s" + a.slot_id}-${a.slot_start}`} className="flex items-center gap-3 px-4 py-3.5">
+                <Avatar name={a.provider_name} role={a.provider_type} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-navy">{a.provider_name}</p>
+                  <p className="truncate text-[15px] font-bold text-navy">{a.provider_name}</p>
                   <p className="text-sm text-muted">{fmtSlot(a.slot_start)}{a.recurring ? ` · ${K.recurring}` : ""}{a.imported ? ` · ${K.fromCalendar}` : ""}</p>
                 </div>
                 {a.visit_id && (
-                  <button className="shrink-0 text-sm text-muted" disabled={busy} onClick={() => send(`/api/visits?id=${a.visit_id}`, "DELETE")}>
+                  <button className={`${quietBtn} shrink-0`} disabled={busy} onClick={() => send(`/api/visits?id=${a.visit_id}`, "DELETE")}>
                     {a.recurring ? K.cancelSeries : K.cancelVisit}
                   </button>
                 )}
@@ -423,8 +438,8 @@ function Buttons({ busy, onCancel }: { busy: boolean; onCancel: () => void }) {
   const K = useCopy().care;
   return (
     <div className="flex gap-3 pt-1">
-      <button type="submit" disabled={busy} className="h-11 flex-1 rounded-full bg-brand text-sm font-bold text-white disabled:opacity-60">{K.save}</button>
-      <button type="button" onClick={onCancel} className="h-11 flex-1 rounded-full border border-line text-sm font-bold text-navy">{K.cancel}</button>
+      <button type="submit" disabled={busy} className={`${inkBtn} flex-1`}>{K.save}</button>
+      <button type="button" onClick={onCancel} className={`${outlineBtn} flex-1`}>{K.cancel}</button>
     </div>
   );
 }
@@ -433,7 +448,7 @@ function MedEditor({ draft, pharmacies, busy, onSave, onCancel }: { draft: MedDr
   const K = useCopy().care;
   const [d, setD] = useState(draft);
   return (
-    <form className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={(e) => { e.preventDefault(); if (d.label.trim()) onSave(d); }}>
+    <form className="mt-3 space-y-4 rounded-[30px] bg-white p-5" onSubmit={(e) => { e.preventDefault(); if (d.label.trim()) onSave(d); }}>
       <Field label={K.medName}><SuggestInput value={d.label} onChange={(v) => setD({ ...d, label: v })} placeholder="Adderall 20 mg" label={K.medName} /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label={K.medDays}><input className={inputClass} type="number" min={0} value={d.days} onChange={(e) => setD({ ...d, days: Number(e.target.value) })} /></Field>
@@ -450,7 +465,7 @@ function MedEditor({ draft, pharmacies, busy, onSave, onCancel }: { draft: MedDr
         </Field>
       )}
       <label className="flex items-center gap-2 text-sm text-navy">
-        <input type="checkbox" className="h-4 w-4 accent-[#5AA9D8]" checked={d.needsVisit} onChange={(e) => setD({ ...d, needsVisit: e.target.checked })} />
+        <input type="checkbox" className="h-4 w-4 accent-[#2A2438]" checked={d.needsVisit} onChange={(e) => setD({ ...d, needsVisit: e.target.checked })} />
         {K.medNeedsVisit}
       </label>
       <Field label={K.medReminder} help={K.medReminderHelp}><input className={inputClass} type="time" value={d.reminder} onChange={(e) => setD({ ...d, reminder: e.target.value })} /></Field>
@@ -467,7 +482,7 @@ function PersonEditor({ draft, busy, onSave, onCancel }: { draft: PersonDraft; b
   const K = useCopy().care;
   const [d, setD] = useState(draft);
   return (
-    <form className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={(e) => { e.preventDefault(); if (d.bookingUrl.trim() || d.providerName.trim() || d.phone.trim()) onSave(d); }}>
+    <form className="mt-3 space-y-4 rounded-[30px] bg-white p-5" onSubmit={(e) => { e.preventDefault(); if (d.bookingUrl.trim() || d.providerName.trim() || d.phone.trim()) onSave(d); }}>
       <Field label={K.link} help={K.linkHelp}>
         <input className={inputClass} type="url" inputMode="url" value={d.bookingUrl} onChange={(e) => setD({ ...d, bookingUrl: e.target.value })} placeholder="https://www.zocdoc.com/doctor/…" />
       </Field>
@@ -481,7 +496,7 @@ function PersonEditor({ draft, busy, onSave, onCancel }: { draft: PersonDraft; b
         <Field label={K.phone}><input className={inputClass} type="tel" value={d.phone} onChange={(e) => setD({ ...d, phone: e.target.value })} /></Field>
       </div>
       <label className="flex items-center gap-2 text-sm text-navy">
-        <input type="checkbox" className="h-4 w-4 accent-[#5AA9D8]" checked={d.video} onChange={(e) => setD({ ...d, video: e.target.checked })} />
+        <input type="checkbox" className="h-4 w-4 accent-[#2A2438]" checked={d.video} onChange={(e) => setD({ ...d, video: e.target.checked })} />
         {K.video}
       </label>
       <Buttons busy={busy} onCancel={onCancel} />
@@ -503,7 +518,7 @@ function VisitEditor({ draft, team, roles, busy, onSave, onCancel }:
   const K = useCopy().care;
   const [d, setD] = useState(draft);
   return (
-    <form id="visit-form" className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={(e) => { e.preventDefault(); if (d.when) onSave(d); }}>
+    <form id="visit-form" className="mt-3 space-y-4 rounded-[30px] bg-white p-5" onSubmit={(e) => { e.preventDefault(); if (d.when) onSave(d); }}>
       <Field label={K.visitWith}>
         <select className={inputClass} value={d.memberId} onChange={(e) => setD({ ...d, memberId: Number(e.target.value) })}>
           {team.map((c) => <option key={c.member_id} value={c.member_id}>{memberName(c, roles)}</option>)}
@@ -521,7 +536,7 @@ function VisitEditor({ draft, team, roles, busy, onSave, onCancel }:
       </Field>
       {d.repeat > 0 && <Field label={K.repeatUntil}><input className={inputClass} type="date" value={d.until} onChange={(e) => setD({ ...d, until: e.target.value })} /></Field>}
       <label className="flex items-center gap-2 text-sm text-navy">
-        <input type="checkbox" className="h-4 w-4 accent-[#5AA9D8]" checked={d.video} onChange={(e) => setD({ ...d, video: e.target.checked })} />
+        <input type="checkbox" className="h-4 w-4 accent-[#2A2438]" checked={d.video} onChange={(e) => setD({ ...d, video: e.target.checked })} />
         {K.video}
       </label>
       <Buttons busy={busy} onCancel={onCancel} />

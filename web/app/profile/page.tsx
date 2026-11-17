@@ -117,7 +117,7 @@ function ProfilePage() {
   if (state !== "ready" || !me) {
     return (
       <Screen nav>
-        <h1 className="mb-4 text-[26px] font-bold text-navy">{P.title}</h1>
+        <h1 className="mb-4 font-display text-[34px] font-semibold text-navy">{P.title}</h1>
         <p className="mb-4 text-muted">{P.none}</p>
         <ButtonLink href="/onboarding">{P.redo}</ButtonLink>
         <BottomNav active="profile" />
@@ -134,7 +134,7 @@ function ProfilePage() {
           <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) pickPhoto(f); e.target.value = ""; }} />
         </label>
         <div>
-          <h1 className="text-[26px] font-bold text-navy">{P.title}</h1>
+          <h1 className="font-display text-[34px] font-semibold text-navy">{P.title}</h1>
           <p className="text-sm text-muted">{P.sub}</p>
           <p className="mt-1 text-xs text-muted">
             {photo ? P.photoChange : P.photo} {photo && <button type="button" onClick={removePhoto} className="ml-2 underline">{P.photoRemove}</button>}
@@ -156,7 +156,7 @@ function ProfilePage() {
           <div className="flex gap-2">
             {(["en", "es", "zh"] as const).map((l) => (
               <button key={l} type="button" onClick={() => { setLang(l); setStatus("idle"); }}
-                className={`flex-1 rounded-full border-2 py-2 text-sm font-bold ${lang === l ? "border-brand bg-brand text-white" : "border-line text-navy"}`}>
+                className={`flex-1 rounded-full border-2 py-2 text-sm font-bold ${lang === l ? "border-brand bg-navy text-white" : "border-line text-navy"}`}>
                 {l === "en" ? "English" : l === "es" ? "Español" : "中文"}
               </button>
             ))}
@@ -172,8 +172,8 @@ function ProfilePage() {
       </div>
 
       <section className="mb-8">
-        <h2 className="mb-2 text-[15px] font-bold text-navy">{S.title}</h2>
-        <div className="rounded-2xl border border-line bg-white px-4 py-3">
+        <h2 className="mb-2 font-display text-[22px] font-semibold text-navy">{S.title}</h2>
+        <div className="rounded-[30px] bg-white px-4 py-3">
           {cal?.google?.connected ? (
             <>
               <p className="font-semibold text-navy">{cal.google.needsReconnect ? S.reconnect : S.connected}</p>
@@ -185,7 +185,7 @@ function ProfilePage() {
                 <button type="button" onClick={disconnectGoogle} className="text-muted">{S.disconnect}</button>
               </div>
               <label className="mt-4 flex items-start gap-3 border-t border-line pt-3 text-sm text-navy">
-                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#5AA9D8]" checked={autoImport} onChange={(e) => toggleAutoImport(e.target.checked)} />
+                <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#2A2438]" checked={autoImport} onChange={(e) => toggleAutoImport(e.target.checked)} />
                 <span><span className="font-semibold">{S.importTitle}</span><br /><span className="text-muted">{S.importExplain}</span></span>
               </label>
               {autoImport && <button type="button" onClick={() => toggleAutoImport(true)} className="mt-2 text-sm font-semibold text-brand">{S.checkNow}</button>}
@@ -194,7 +194,7 @@ function ProfilePage() {
           ) : (
             <>
               <p className="mb-3 text-sm text-muted">{S.explain}</p>
-              <a href="/api/auth/google?calendar=1&next=/profile" className="flex h-11 items-center justify-center rounded-full bg-brand text-sm font-bold text-white">{S.connect}</a>
+              <a href="/api/auth/google?calendar=1&next=/profile" className="flex h-11 items-center justify-center rounded-full bg-navy text-sm font-bold text-white">{S.connect}</a>
             </>
           )}
         </div>

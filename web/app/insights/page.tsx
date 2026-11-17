@@ -21,7 +21,7 @@ export default function Insights() {
   return (
     <Screen nav>
       <Eyebrow>Insights</Eyebrow>
-      <h1 className="mt-1 text-[26px] font-bold text-navy">Care, booked ahead</h1>
+      <h1 className="mt-1 font-display text-[34px] font-semibold text-navy">Care, booked ahead</h1>
       <p className="mb-5 text-sm text-muted">Visits booked and FaceTime calls over the last 3 weeks.</p>
 
       {error && <p className="text-sm text-muted">Something went wrong on our side. Please try again in a moment.</p>}
@@ -47,7 +47,7 @@ export default function Insights() {
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-bold text-navy">Visits booked per day</p>
               <div className="flex gap-3 text-[11px] text-muted">
-                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-brand" />FaceTime</span>
+                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-navy" />FaceTime</span>
                 <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-mist" />Web</span>
               </div>
             </div>
@@ -56,7 +56,7 @@ export default function Insights() {
                 const total = d.web + d.facetime;
                 return (
                   <div key={d.day} className="flex h-full flex-1 flex-col justify-end" title={`${fmtDay(d.day)}: ${d.facetime} by FaceTime, ${d.web} on web`}>
-                    <div className="w-full rounded-t-sm bg-brand" style={{ height: `${(d.facetime / max) * 100}%` }} />
+                    <div className="w-full rounded-t-sm bg-navy" style={{ height: `${(d.facetime / max) * 100}%` }} />
                     <div className={`w-full bg-mist ${d.facetime ? "" : "rounded-t-sm"}`} style={{ height: `${(d.web / max) * 100}%` }} />
                     {total === 0 && <div className="h-[2px] w-full bg-line" />}
                   </div>

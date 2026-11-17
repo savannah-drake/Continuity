@@ -73,16 +73,16 @@ export function AlertSettings({ emailOn: initialEmail, email }: { emailOn: boole
 
   return (
     <section className="mb-8">
-      <h2 className="mb-1 text-[15px] font-bold text-navy">{A.title}</h2>
+      <h2 className="mb-1 font-display text-[22px] font-semibold text-navy">{A.title}</h2>
       <p className="mb-3 text-sm text-muted">{A.sub}</p>
-      <div className="rounded-2xl border border-line bg-white px-4 py-3 text-sm text-navy">
+      <div className="rounded-[30px] bg-white px-4 py-3 text-sm text-navy">
         <label className="flex items-start gap-3">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#5AA9D8]" checked={push} onChange={(e) => togglePush(e.target.checked)} />
+          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#2A2438]" checked={push} onChange={(e) => togglePush(e.target.checked)} />
           <span><span className="font-semibold">{A.push}</span><br /><span className="text-muted">{A.pushHelp}</span></span>
         </label>
         {email && (
           <label className="mt-3 flex items-start gap-3 border-t border-line pt-3">
-            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#5AA9D8]" checked={emailOn} onChange={(e) => toggleEmail(e.target.checked)} />
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#2A2438]" checked={emailOn} onChange={(e) => toggleEmail(e.target.checked)} />
             <span><span className="font-semibold">{A.email}</span><br /><span className="text-muted">{email}</span></span>
           </label>
         )}

@@ -127,7 +127,7 @@ export default function Onboarding() {
               <div className="flex rounded-full bg-mist p-1">
                 {(["en", "es", "zh"] as const).map((l) => (
                   <button type="button" key={l} onClick={() => setLang(l)}
-                    className={`flex-1 rounded-full py-2 text-sm font-bold ${lang === l ? "bg-brand text-white" : "text-navy"}`}>
+                    className={`flex-1 rounded-full py-2 text-sm font-bold ${lang === l ? "bg-navy text-white" : "text-navy"}`}>
                     {C.languages[l]}
                   </button>
                 ))}
@@ -161,7 +161,7 @@ export default function Onboarding() {
             <div className="flex rounded-full bg-mist p-1">
               {(["both", "psychiatry"] as const).map((k) => (
                 <button type="button" key={k} onClick={() => setCareType(k)}
-                  className={`flex-1 rounded-full py-2 text-sm font-bold ${careType === k ? "bg-brand text-white" : "text-navy"}`}>
+                  className={`flex-1 rounded-full py-2 text-sm font-bold ${careType === k ? "bg-navy text-white" : "text-navy"}`}>
                   {C.careTypes[k]}
                 </button>
               ))}
@@ -186,7 +186,7 @@ export default function Onboarding() {
                 <input className={inputClass} type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
               </Field>
               <label className="flex items-center gap-2 text-sm text-navy">
-                <input type="checkbox" className="h-4 w-4 accent-[#5AA9D8]" checked={needsAppt} onChange={(e) => setNeedsAppt(e.target.checked)} />
+                <input type="checkbox" className="h-4 w-4 accent-[#2A2438]" checked={needsAppt} onChange={(e) => setNeedsAppt(e.target.checked)} />
                 {C.needsApptLabel}
               </label>
               <Field label={C.leadLabel}>
@@ -219,7 +219,7 @@ export default function Onboarding() {
           <Title sub={C.calendarHelp}>{C.calendarTitle}</Title>
           <div className="mb-8 space-y-4">
             <label className="flex items-start gap-3 text-sm text-navy">
-              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#5AA9D8]" checked={connectGoogle} onChange={(e) => setConnectGoogle(e.target.checked)} />
+              <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#2A2438]" checked={connectGoogle} onChange={(e) => setConnectGoogle(e.target.checked)} />
               <span><span className="font-bold">{COPY.calendarSync.connect}</span><br /><span className="text-muted">{COPY.calendarSync.explain}</span></span>
             </label>
             {!connectGoogle && (<>

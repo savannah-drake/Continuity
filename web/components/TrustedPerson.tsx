@@ -32,9 +32,9 @@ export function TrustedPerson({ current, onChange }: { current: { contact_name: 
 
   return (
     <section className="mb-8">
-      <h2 className="mb-1 text-[15px] font-bold text-navy">{A.trustedHeading}</h2>
+      <h2 className="mb-1 font-display text-[22px] font-semibold text-navy">{A.trustedHeading}</h2>
       <p className="mb-3 text-sm text-muted">{A.trustedSub}</p>
-      <form onSubmit={save} className="space-y-3 rounded-2xl border border-line bg-white px-4 py-3">
+      <form onSubmit={save} className="space-y-3 rounded-[30px] bg-white px-4 py-3">
         <div className="grid grid-cols-2 gap-3">
           <Field label={A.trustedName}><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required /></Field>
           <Field label={A.trustedEmail}><input className={inputClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>

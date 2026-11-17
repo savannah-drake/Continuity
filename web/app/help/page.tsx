@@ -29,7 +29,7 @@ export default function HelpPage() {
 
   return (
     <Screen nav>
-      <h1 className="text-[26px] font-bold text-navy">{H.title}</h1>
+      <h1 className="font-display text-[34px] font-semibold text-navy">{H.title}</h1>
       <p className="mb-4 text-sm text-muted">{H.sub}</p>
 
       <div className="mb-3 flex gap-2">
@@ -42,7 +42,7 @@ export default function HelpPage() {
 
       <label className="mb-1 block text-sm font-bold text-navy" htmlFor="need">{H.ask}</label>
       <textarea id="need" rows={2} value={input} onChange={(e) => setInput(e.target.value)} placeholder={H.askPlaceholder}
-        className="mb-1 w-full rounded-2xl border border-line bg-white p-3 text-sm text-navy placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand" />
+        className="mb-1 w-full rounded-[30px] bg-white p-3 text-sm text-navy placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand" />
       <p className="mb-4 text-xs text-muted">{H.privacy}</p>
 
       <div className="space-y-3">
@@ -55,7 +55,7 @@ export default function HelpPage() {
             <p className="mt-1 text-sm text-muted">{lang === "es" ? r.description_es : r.description}</p>
             <p className="mt-1 text-sm font-semibold text-navy">{lang === "es" ? r.how_es : r.how}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {r.call && <a href={`tel:${r.call}`} className="rounded-full bg-brand px-4 py-1.5 text-sm font-bold text-white">{H.call}</a>}
+              {r.call && <a href={`tel:${r.call}`} className="rounded-full bg-navy px-4 py-1.5 text-sm font-bold text-white">{H.call}</a>}
               {r.text_to && <a href={smsHref(r.text_to, r.id === "988" && lang === "es" ? "AYUDA" : r.text_body)} className="rounded-full border-2 border-brand px-4 py-1.5 text-sm font-bold text-brand">{H.text}</a>}
               {r.web && <a href={r.web} target="_blank" rel="noreferrer" className="rounded-full px-2 py-1.5 text-sm font-semibold text-brand underline">{H.website}</a>}
             </div>

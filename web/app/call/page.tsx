@@ -164,7 +164,7 @@ export default function CallPage() {
         <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 h-full w-full object-contain ${hasVideo ? "" : "hidden"}`} />
         {!hasVideo && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src="/mascot.png" alt="" className={`absolute inset-0 m-auto h-2/3 w-2/3 object-contain ${phase === "connecting" ? "animate-pulse" : ""}`} />
+          <img src="/mascot-lavender.png" alt="" className={`absolute inset-0 m-auto h-2/3 w-2/3 object-contain ${phase === "connecting" ? "animate-pulse" : ""}`} />
         )}
         {phase === "live" && agentState === "speaking" && (
           <span className="absolute bottom-4 left-1/2 h-1.5 w-16 -translate-x-1/2 rounded-full bg-brand/70" aria-hidden />
@@ -188,7 +188,7 @@ export default function CallPage() {
           </div>
         ) : (
           <button onClick={start} disabled={state !== "ready"}
-            className="h-12 w-full rounded-full bg-brand text-[15px] font-bold text-white disabled:opacity-60">
+            className="h-12 w-full rounded-full bg-navy text-[15px] font-bold text-white disabled:opacity-60">
             {phase === "ended" || phase === "error" ? L.again : L.start}
           </button>
         )}

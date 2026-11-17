@@ -7,13 +7,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { LANGS, localeFor, type Lang } from "@/lib/copy";
 import { useMe, visitLine, fmtShort, fmtSlot, bookingHref } from "@/lib/useMe";
-import { Screen, BottomNav } from "@/components/ui";
-import { ArrowIcon } from "@/components/icons";
+import { Screen, BottomNav, Scallop, SectionTitle, toneBg, statusTone, inkBtn, outlineBtn, smallInkBtn, smallOutlineBtn, type Tone } from "@/components/ui";
+import { ArrowIcon, PhoneIcon } from "@/components/icons";
 
 const diffFromToday = (today: string, d: string) =>
   Math.round((new Date(`${d}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86_400_000);
 
-const dot = (status: string) => (status === "red" ? "bg-coral" : status === "yellow" ? "bg-attn" : "bg-live");
 
 export default function HomePage() {
   return <Suspense fallback={null}><Home /></Suspense>;
@@ -34,128 +33,137 @@ function Home() {
   if (state === "error" || !me) return <Screen><p className="text-muted">{COPY.onboarding.error}</p></Screen>;
 
   const name = me.user.display_name || "";
-  const next = me.appointments[0];
   const todayLabel = new Date(`${me.today}T12:00:00`).toLocaleDateString(localeFor(lang), { weekday: "long", month: "long", day: "numeric" });
-  const hasSteps = me.medications.length > 0 || !!me.therapy || !!next;
+  const hasSteps = me.medications.length > 0 || !!me.therapy || me.appointments.length > 0;
+
+  const tile = (key: string, tone: Tone, kicker: string, title: string, sub: string, foot: React.ReactNode) => (
+    <div key={key} className={`flex min-h-[168px] flex-col justify-between rounded-[28px] p-[18px] ${toneBg[tone]}`}>
+      <div>
+        <p className="text-[13px] font-semibold text-navy/70">{kicker}</p>
+        <p className="mt-1.5 font-display text-[21px] font-semibold leading-[1.12] text-navy">{title}</p>
+        <p className="mt-1.5 text-[13px] leading-snug text-navy/80">{sub}</p>
+      </div>
+      <div className="mt-3">{foot}</div>
+    </div>
+  );
+  const pharmacy = me.pharmacies.find((p) => p.preferred) ?? me.pharmacies[0];
+  const due = me.medications.find((m) => m.bookApptBy && !m.visitBooked && diffFromToday(me.today, m.bookApptBy) <= 14);
+  const moodTones: Tone[] = ["blush", "peach", "butter", "mint", "lavender"];
 
   return (
     <Screen nav>
-      <header className="mb-6 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[26px] font-bold leading-tight text-navy">{name ? H.hi(name) : COPY.appName}</h1>
-          <p className="mt-0.5 text-sm text-muted">{todayLabel}</p>
+      <header className="mb-5 flex items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blush font-display text-[18px] font-bold text-navy">{(name || "?").slice(0, 1).toUpperCase()}</div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-bold text-navy">{name ? H.hi(name) : COPY.appName}</p>
+          <p className="text-[13px] text-muted">{todayLabel}</p>
         </div>
         <select aria-label={COPY.profile.language} value={lang} onChange={(e) => setLang(e.target.value as Lang)}
-          className="mt-1 rounded-full border border-line bg-white px-3 py-1 text-sm font-semibold text-navy">
+          className="h-9 rounded-full border-0 bg-white px-3 text-[13px] font-semibold text-navy">
           {LANGS.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
         </select>
       </header>
 
-      {/* Voice call in the browser */}
-      <Link href="/call" className="flex items-center gap-4 rounded-2xl bg-brand px-4 py-3 text-white hover:brightness-95">
-        <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mascot.png" alt="" className="h-full w-full object-contain" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[16px] font-bold">{H.talk}</span>
-          <span className="block text-[13px] text-white/85">{H.talkHelp}</span>
-        </span>
-        <ArrowIcon size={20} />
-      </Link>
-      <div className="mb-6" />
+      <h1 className="mb-6 font-display text-[38px] font-semibold leading-[1.04] tracking-[-0.4px] text-navy">
+        {H.tagline1}<br /><span className="font-medium italic">{H.tagline2}</span>
+      </h1>
 
-      {/* Time to book: a renewal visit is due soon for a medication */}
-      {(() => {
-        const due = me.medications.find((m) => m.bookApptBy && !m.visitBooked && diffFromToday(me.today, m.bookApptBy) <= 14);
-        if (!due) return null;
+      {/* Voice call in the browser */}
+      <section className="mb-5 flex items-center gap-4 rounded-[30px] bg-lavender p-5">
+        <Scallop size={86} tone="white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/mascot-lavender.png" alt="" className="mascot-float h-[60px] w-[60px] object-contain" />
+        </Scallop>
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-2.5">
+          <div>
+            <p className="font-display text-[22px] font-semibold leading-tight text-navy">{H.talkTitle}</p>
+            <p className="mt-1 text-[13px] text-[#3E3470]">{H.talkHelp}</p>
+          </div>
+          <Link href="/call" className={inkBtn}>{H.start}<ArrowIcon size={18} /></Link>
+        </div>
+      </section>
+
+      {/* Time to book: a renewal visit is due soon for a medication (rose when urgent, butter when coming up) */}
+      {due && (() => {
         const days = diffFromToday(me.today, due.bookApptBy!);
+        const urgent = due.status === "red" || days <= 2;
         return (
-          <section className={`mb-6 rounded-2xl px-4 py-4 ${days <= 2 ? "bg-coral/15" : "bg-attn-tint"}`}>
-            <p className="text-[17px] font-bold text-navy">{days <= 0 ? H.bookNowTitle : H.timeToBookTitle}</p>
-            <p className="mt-1 text-sm text-navy">{H.timeToBookBody(due.label, fmtShort(due.supplyEndDate), fmtShort(due.apptBy ?? due.supplyEndDate), days)}</p>
-            <div className="mt-3 flex items-center gap-5 text-sm font-semibold">
-              <BookLink to={bookingHref(me, "psychiatrist")} className="rounded-full bg-navy px-4 py-2 text-white">{H.findTime}</BookLink>
-              <Link href="/care" className="text-navy">{H.alreadyBooked}</Link>
+          <section className={`mb-6 flex flex-col gap-3.5 rounded-[30px] p-5 ${urgent ? "bg-rose" : "bg-butter"}`}>
+            <div className="flex items-center gap-3.5">
+              <Scallop size={84} tone={urgent ? "butter" : "white"}>
+                <p className="font-display text-[30px] font-bold leading-none text-navy">{Math.max(0, due.daysLeft)}</p>
+                <p className="text-[11px] font-bold text-navy">{H.daysLeftBadge}</p>
+              </Scallop>
+              <div className="min-w-0">
+                <p className="font-display text-[24px] font-semibold leading-tight text-navy">{days <= 0 ? H.bookNowTitle : H.timeToBookTitle}</p>
+                <p className="mt-1.5 text-[14px] leading-snug text-navy/85">{H.timeToBookBody(due.label, fmtShort(due.supplyEndDate), fmtShort(due.apptBy ?? due.supplyEndDate), days)}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <BookLink to={bookingHref(me, "psychiatrist")} className={inkBtn}>{H.findTime}<ArrowIcon size={18} /></BookLink>
+              <Link href="/care" className={outlineBtn}>{H.alreadyBooked}</Link>
             </div>
           </section>
         );
       })()}
 
-      {/* What's next, in one list */}
-      <h2 className="mb-2 text-[15px] font-bold text-navy">{H.nextSteps}</h2>
-      {!hasSteps && <p className="mb-6 text-sm text-muted">{H.noneYet} <Link href="/care" className="font-semibold text-brand">{COPY.nav.care}</Link></p>}
-      {hasSteps && (
-        <ul className="mb-8 divide-y divide-line rounded-2xl border border-line bg-white">
-          {me.medications.map((m) => {
-            const needsVisit = !!m.bookApptBy && !m.visitBooked;
-            return (
-              <li key={m.medicationId} className="flex items-center gap-3 px-4 py-3">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${dot(m.status)}`} aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-navy">{H.daysLeft(m.label, m.daysLeft)}</p>
-                  <p className={`text-sm ${m.status === "green" ? "text-muted" : "text-attn-text"}`}>
-                    {m.rxSentOn ? H.rxSent(m.pharmacy?.name ?? null)
-                      : needsVisit ? visitLine(m, me.today, H, fmtShort)
-                      : m.nextAction === "request_rx" && m.requestRxBy ? H.requestRxBy(fmtShort(m.requestRxBy))
-                      : H.onTrack(fmtShort(m.supplyEndDate))}
-                  </p>
-                </div>
-                {needsVisit && (
-                  <BookLink to={bookingHref(me, "psychiatrist")} className="shrink-0 text-sm font-semibold text-brand">{H.findTime}</BookLink>
-                )}
-              </li>
-            );
-          })}
-          {me.therapy && !me.therapy.sessionBooked && (
-            <li className="flex items-center gap-3 px-4 py-3">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${dot(me.therapy.status)}`} aria-hidden />
-              <p className="min-w-0 flex-1 font-semibold text-navy">{H.therapyDue(fmtShort(me.therapy.bookBy))}</p>
-              <BookLink to={bookingHref(me, "therapist")} className="shrink-0 text-sm font-semibold text-brand">{H.findTime}</BookLink>
-            </li>
-          )}
-          {next && (
-            <li className="flex items-center gap-3 px-4 py-3">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-brand" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted">{H.nextVisit}</p>
-                <p className="truncate font-semibold text-navy">{H.nextVisitLine(next.provider_name, fmtSlot(next.slot_start))}</p>
-              </div>
-            </li>
-          )}
-        </ul>
-      )}
+      {/* Coming up: visits, medications, therapy and your pharmacy as colored tiles */}
+      <SectionTitle action={<Link href="/timeline" className={smallOutlineBtn}>{H.seeAll}</Link>}>{H.comingUp}</SectionTitle>
+      {!hasSteps && !pharmacy && <p className="mb-8 text-sm text-muted">{H.noneYet} <Link href="/care" className="font-semibold text-brand underline">{COPY.nav.care}</Link></p>}
+      <div className="mb-8 grid grid-cols-2 gap-3">
+        {me.appointments.slice(0, 2).map((a) => tile(`v${a.visit_id ?? a.slot_start}`, a.provider_type === "therapist" ? "lavender" : a.provider_type === "psychiatrist" ? "peach" : "mint",
+          a.provider_type === "psychiatrist" ? H.tilePsych : a.provider_type === "therapist" ? H.tileTherapy : H.tileVisit,
+          fmtSlot(a.slot_start), a.provider_name,
+          <span className={smallInkBtn}>{H.booked}</span>))}
+        {me.medications.map((m) => {
+          const needsVisit = !!m.bookApptBy && !m.visitBooked;
+          const line = m.rxSentOn ? H.rxSent(m.pharmacy?.name ?? null)
+            : needsVisit ? visitLine(m, me.today, H, fmtShort)
+            : m.nextAction === "request_rx" && m.requestRxBy ? H.requestRxBy(fmtShort(m.requestRxBy))
+            : H.onTrack(fmtShort(m.supplyEndDate));
+          return tile(`m${m.medicationId}`, statusTone(m.status), H.tileMed, H.daysLeft(m.label, m.daysLeft), line,
+            needsVisit
+              ? <BookLink to={bookingHref(me, "psychiatrist")} className={smallInkBtn}>{H.findTime}<ArrowIcon size={14} /></BookLink>
+              : <Link href="/care" className={smallInkBtn}>{H.details}<ArrowIcon size={14} /></Link>);
+        })}
+        {me.therapy && !me.therapy.sessionBooked && tile("therapy", statusTone(me.therapy.status), H.tileTherapy, H.therapyDue(fmtShort(me.therapy.bookBy)), "",
+          <BookLink to={bookingHref(me, "therapist")} className={smallInkBtn}>{H.findTime}<ArrowIcon size={14} /></BookLink>)}
+        {pharmacy && tile("pharmacy", "white", H.tilePharmacy, pharmacy.pharmacy_name, pharmacy.address ?? "",
+          pharmacy.phone
+            ? <a href={`tel:${pharmacy.phone}`} className={smallInkBtn}><PhoneIcon size={14} />{H.callShort}</a>
+            : <Link href="/care" className={smallInkBtn}>{H.details}<ArrowIcon size={14} /></Link>)}
+      </div>
 
-      {/* Mood check-in */}
-      <h2 className="mb-2 text-[15px] font-bold text-navy">{COPY.mood.question}</h2>
-      <div className="mb-3 flex flex-wrap gap-2">
-        {COPY.mood.choices.map((c) => (
+      {/* Mood check-in: three on top, two below */}
+      <h2 className="mb-3 font-display text-[24px] font-semibold text-navy">{COPY.mood.question}</h2>
+      <div className="mb-3 grid grid-cols-6 gap-2.5">
+        {COPY.mood.choices.map((c, i) => (
           <button key={c} onClick={() => setMood(c)} aria-pressed={mood === c}
-            className={`rounded-full border px-3.5 py-1.5 text-sm ${mood === c ? "border-navy bg-navy text-white" : "border-line bg-white text-navy"}`}>
+            className={`h-[76px] rounded-3xl font-display text-[16px] font-semibold text-navy transition ${i < 3 ? "col-span-2" : "col-span-3"} ${mood === c ? "bg-navy text-white" : toneBg[moodTones[i % moodTones.length]]}`}>
             {c}
           </button>
         ))}
       </div>
       {mood && (
-        <div className="mb-6 text-sm text-navy">
+        <div className="mb-6 rounded-3xl bg-white p-4 text-sm text-navy">
           <p>{COPY.mood.replies[mood]}</p>
           {mood === COPY.mood.choices[0] && (
             <>
               <p className="mt-2 font-semibold">{COPY.mood.crisis}</p>
               {/* Opens the phone's dialer / messages app. We can't connect the call for them. */}
               <div className="mt-3 flex gap-2">
-                <a href="tel:988" className="flex-1 rounded-full bg-navy py-2 text-center text-sm font-bold text-white">{COPY.help.call988}</a>
-                <a href={lang === "es" ? "sms:988?&body=AYUDA" : "sms:988"} className="flex-1 rounded-full border border-navy py-2 text-center text-sm font-bold text-navy">{COPY.help.text988}</a>
+                <a href="tel:988" className={`${inkBtn} flex-1`}>{COPY.help.call988}</a>
+                <a href={lang === "es" ? "sms:988?&body=AYUDA" : "sms:988"} className={`${outlineBtn} flex-1`}>{COPY.help.text988}</a>
               </div>
             </>
           )}
         </div>
       )}
 
-      <div className="mt-8 flex justify-between text-sm font-semibold">
-        <Link href="/help" className="text-navy">{H.support}</Link>
+      <div className="mt-6">
+        <Link href="/help" className={smallOutlineBtn}>{H.support}</Link>
       </div>
-      <p className="mt-4 text-[11px] text-muted">{COPY.aiDisclosure}</p>
+      <p className="mt-4 text-[12px] text-muted">{COPY.aiDisclosure}</p>
       <BottomNav active="home" />
     </Screen>
   );
@@ -175,34 +183,49 @@ function Welcome() {
   const params = useSearchParams();
   const signin = params.get("signin");
   return (
-    <Screen>
-      <div className="flex min-h-[80vh] flex-col justify-between">
-        <div className="mt-10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mascot.png" alt="" className="mb-6 h-20 w-20 object-contain" />
-          <h1 className="text-[30px] font-bold leading-tight text-navy">{W.heading}</h1>
-          <p className="mt-2 text-[15px] text-muted">{W.sub}</p>
-          <ul className="mt-8 space-y-4">
-            {W.cards.map((c) => (
-              <li key={c.title} className="border-l-2 border-brand pl-3">
-                <p className="font-semibold text-navy">{c.title}</p>
-                <p className="text-sm text-muted">{c.body}</p>
-              </li>
-            ))}
-          </ul>
+    <main className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-canvas px-7 pb-9 pt-11">
+      <div className="flex flex-col items-center gap-3.5 text-center">
+        <div className="flex flex-col items-center">
+          <div className="relative h-32 w-32">
+            <div className="absolute left-[14px] top-[18px] h-[100px] w-[100px] rounded-full bg-lavender" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/mascot-lavender.png" alt="Continuity mascot" className="mascot-float relative h-32 w-32 object-contain" />
+          </div>
+          <p className="font-display text-[30px] font-bold tracking-[-0.3px] text-navy">{COPY.appName}</p>
         </div>
-        <div className="mt-10 space-y-3">
-          {signin && <p className="text-sm text-attn-text">{signin === "cancelled" ? A.cancelled : A.failed}</p>}
-          <a href="/api/auth/google" className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-line bg-white text-[15px] font-bold text-navy hover:bg-mist/40">
-            <GoogleMark /> {A.google}
-          </a>
-          <p className="flex justify-center gap-4 pt-2 text-xs text-muted">
-            <Link href="/privacy" className="underline">{COPY.profile.privacyLink}</Link>
-            <Link href="/terms" className="underline">{COPY.profile.termsLink}</Link>
-          </p>
+        <h1 className="mt-2 font-display text-[36px] font-semibold leading-[1.05] tracking-[-0.4px] text-navy">
+          {W.head1} <span className="font-medium italic">{W.headItalic}</span><br />{W.head2}
+        </h1>
+        <p className="max-w-[300px] text-[15px] leading-relaxed text-muted">{W.blurb}</p>
+      </div>
+
+      {/* Stacked shapes: refills, visits, reminders */}
+      <div className="relative mx-auto mt-6 h-[250px] w-[350px] max-w-full" aria-hidden>
+        <div className="absolute left-[150px] top-2 flex h-[150px] w-[170px] -rotate-[8deg] flex-col rounded-[30px] bg-butter px-[18px] py-5">
+          <p className="font-display text-[23px] font-semibold text-navy">{W.refills}</p>
+          <p className="mt-0.5 text-[12px] text-[#5B4A12]">{W.refillsSub}</p>
+        </div>
+        <Scallop size={140} tone="blush" className="absolute left-0 top-[46px]">
+          <p className="-rotate-[14deg] font-display text-[21px] font-semibold text-navy">{W.visits}</p>
+          <p className="mt-0.5 -rotate-[14deg] text-[11px] text-[#6B2E47]">{W.visitsSub}</p>
+        </Scallop>
+        <div className="absolute left-[110px] top-[118px] flex h-[132px] w-[132px] flex-col items-center justify-center rounded-full bg-mint text-center">
+          <p className="rotate-[10deg] font-display text-[20px] font-semibold text-navy">{W.reminders}</p>
+          <p className="mt-0.5 rotate-[10deg] text-[11px] text-[#24533C]">{W.remindersSub}</p>
         </div>
       </div>
-    </Screen>
+
+      <div className="mt-auto space-y-3.5 pt-8">
+        {signin && <p className="text-center text-sm text-coral">{signin === "cancelled" ? A.cancelled : A.failed}</p>}
+        <a href="/api/auth/google" className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-navy text-[16px] font-bold text-white hover:brightness-110">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white"><GoogleMark /></span> {A.google}
+        </a>
+        <p className="flex justify-center gap-5 text-[13px] text-muted">
+          <Link href="/privacy" className="underline">{COPY.profile.privacyLink}</Link>
+          <Link href="/terms" className="underline">{COPY.profile.termsLink}</Link>
+        </p>
+      </div>
+    </main>
   );
 }
 
