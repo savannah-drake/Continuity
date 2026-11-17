@@ -27,7 +27,15 @@ export function AlertSettings({ emailOn: initialEmail, email }: { emailOn: boole
 
   async function togglePush(on: boolean) {
     setNote(null);
+    if (!VAPID) { setNote("Notifications aren't set up on the server yet (missing NEXT_PUBLIC_VAPID_PUBLIC_KEY)."); return; }
     if (!supported) { setNote(A.unsupported); return; }
+    try { await turnPush(on); } catch (e) {
+      console.error("push setup failed", e);
+      setNote(`${A.blocked} (${e instanceof Error ? e.message : String(e)})`);
+    }
+  }
+
+  async function turnPush(on: boolean) {
     const reg = await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
     if (!on) {
