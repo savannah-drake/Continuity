@@ -51,12 +51,18 @@ export function AlertSettings({ emailOn: initialEmail, email }: { emailOn: boole
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(VAPID) });
     const res = await fetch("/api/push", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sub.toJSON()) }).catch(() => null);
     setPush(!!res?.ok);
+    if (res?.ok) await runNow(true); // send anything already due to this phone right away
   }
 
   async function toggleEmail(on: boolean) {
     setEmailOn(on);
     const res = await fetch("/api/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ alertEmail: on }) }).catch(() => null);
     if (!res?.ok) setEmailOn(!on);
+  }
+
+  async function runNow(quiet = false) {
+    const d = await fetch("/api/alerts/run", { method: "POST" }).then((r) => r.json()).catch(() => ({ sent: 0 }));
+    if (!quiet || d.sent) setNote(d.sent ? A.ranSent(d.sent) : A.ranNothing);
   }
 
   async function test() {
@@ -80,7 +86,11 @@ export function AlertSettings({ emailOn: initialEmail, email }: { emailOn: boole
             <span><span className="font-semibold">{A.email}</span><br /><span className="text-muted">{email}</span></span>
           </label>
         )}
-        <button type="button" onClick={test} className="mt-3 font-semibold text-brand">{A.test}</button>
+        <div className="mt-3 flex gap-5 font-semibold">
+          <button type="button" onClick={() => runNow()} className="text-brand">{A.runNow}</button>
+          <button type="button" onClick={test} className="text-muted">{A.test}</button>
+        </div>
+        <p className="mt-2 text-xs text-muted">{A.schedule}</p>
         {note && <p className="mt-2 text-muted" role="status">{note}</p>}
       </div>
     </section>
