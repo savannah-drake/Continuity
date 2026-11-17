@@ -21,8 +21,10 @@ export default function TimelinePage() {
   const steps: Step[] = [{ date: me.today, title: T.today, dot: "today" }];
 
   for (const a of me.appointments) {
-    steps.push({ date: isoDay(a.slot_start), title: T.visitBooked(a.provider_name),
-      body: `${fmtTime(a.slot_start)} · ${a.telehealth ? COPY.booking.video : COPY.booking.inPerson}`,
+    // Imported visits: we don't know if they're in person, so only say "Video" when we know it is
+    const how = a.telehealth ? ` · ${COPY.booking.video}` : a.imported ? "" : ` · ${COPY.booking.inPerson}`;
+    steps.push({ date: isoDay(a.slot_start), title: a.provider_type === "psychiatrist" ? T.psychWith(a.provider_name) : T.therapyWith(a.provider_name),
+      body: `${fmtTime(a.slot_start)}${how}`,
       dot: "confirmed", tag: { text: COPY.tags.confirmed, tone: "mint" } });
   }
   // Every medication gets its own steps
@@ -32,8 +34,11 @@ export default function TimelinePage() {
       steps.push({ date: m.bookApptBy < me.today ? me.today : m.bookApptBy, title: many ? `${T.bookBy} · ${m.label}` : T.bookBy,
         body: T.bookByBody(m.label), dot: "action", tag: { text: COPY.tags.needsAction, tone: "attn" } });
     }
-    steps.push({ date: m.rxNeededBy, title: many ? `${T.rxNeededBy} · ${m.label}` : T.rxNeededBy, body: T.rxNeededByBody, dot: "later" });
-    steps.push({ date: m.supplyEndDate, title: T.supplyEnd(m.label), body: T.supplyEndBody, dot: "end" });
+    // With a visit booked, the renewal comes after it; if that's on or after the last day, say there may be a gap
+    const rxDate = m.visitDate && m.visitDate > m.rxNeededBy ? m.visitDate : m.rxNeededBy < me.today ? me.today : m.rxNeededBy;
+    const gap = !!m.visitDate && m.visitDate >= m.rxNeededBy;
+    if (m.bookApptBy || m.rxNeededBy >= me.today) steps.push({ date: rxDate, title: many ? `${T.rxNeededBy} · ${m.label}` : T.rxNeededBy, body: m.visitDate ? T.rxAfterVisit : T.rxNeededByBody, dot: "later" });
+    steps.push({ date: m.supplyEndDate, title: T.supplyEnd(m.label), body: gap ? T.gapWarning : T.supplyEndBody, dot: "end" });
   }
   if (me.therapy && !me.therapy.sessionBooked) {
     steps.push({ date: me.therapy.bookBy < me.today ? me.today : me.therapy.bookBy, title: T.therapyBookBy,

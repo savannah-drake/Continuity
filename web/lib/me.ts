@@ -114,6 +114,7 @@ AND v.status = 'scheduled'`,
       daysLeft: Math.max(0, diffDays(today, t.supplyEndDate)),
       ...t,
       visitBooked: !!psychVisit,
+      visitDate: psychVisit ? dayET(psychVisit.slot_start) : null,
       nextAction: psychVisit ? "visit_booked" : t.nextAction,
       status: psychVisit ? "green" : t.status,
     };
@@ -122,7 +123,8 @@ AND v.status = 'scheduled'`,
   let therapy = null;
   if (user.last_therapy_session && user.therapy_cadence_days) {
     const t = computeTherapyTimeline({ lastSessionDate: user.last_therapy_session, cadenceDays: user.therapy_cadence_days }, today);
-    const session = appointments.find((a: any) => a.provider_type !== "psychiatrist" && dayET(a.slot_start) <= t.nextSessionBy);
+    // A therapy visit before the due date counts; if the due date already passed, any upcoming therapy visit does
+    const session = appointments.find((a: any) => a.provider_type !== "psychiatrist" && (dayET(a.slot_start) <= t.nextSessionBy || t.nextSessionBy <= today));
     therapy = { ...t, sessionBooked: !!session, nextAction: session ? "visit_booked" : t.nextAction, status: session ? "green" : t.status };
   }
 

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 export type MedTimeline = {
   medicationId: number; label: string; reminderTime: string | null;
   refillsRemaining: number; rxExpiresOn: string | null; requiresAppointmentForRenewal: boolean; bookingLeadDays: number;
-  daysLeft: number; supplyEndDate: string; refillDeadline: string; rxNeededBy: string;
+  daysLeft: number; visitDate?: string | null; supplyEndDate: string; refillDeadline: string; rxNeededBy: string;
   apptBy: string | null; bookApptBy: string | null; renewalReason: "no_refills" | "rx_expires" | "appointment_required" | null;
   status: "green" | "yellow" | "red"; nextAction: string; visitBooked: boolean;
 };
