@@ -9,12 +9,15 @@ export async function GET(req: NextRequest) {
   const userId = await getSessionUserId();
   if (!userId) return unauthorizedJson();
   const params = req.nextUrl.searchParams;
-  const typed = params.get("zip") ?? "";
+  // A ZIP typed into the search box counts as a ZIP
+  let q = (params.get("q") ?? "").trim();
+  let typed = params.get("zip") ?? "";
+  if (/^\d{5}$/.test(q)) { typed = q; q = ""; }
   const [u] = await query<{ home_zip: string | null; home_lat: number | null; home_lng: number | null }>(
 `SELECT u.home_zip, u.home_lat, u.home_lng
 FROM users u
 WHERE u.user_id = $1`, [userId]);
   const zip = /^\d{5}$/.test(typed) ? typed : u?.home_zip ?? null;
-  const pharmacies = await pharmaciesNear({ zip, lat: zip ? null : u?.home_lat, lng: zip ? null : u?.home_lng, q: params.get("q") ?? "" });
+  const pharmacies = await pharmaciesNear({ zip, lat: zip ? null : u?.home_lat, lng: zip ? null : u?.home_lng, q });
   return Response.json({ zip, pharmacies });
 }

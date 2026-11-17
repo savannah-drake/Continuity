@@ -51,8 +51,11 @@ async function npiArea(prefix: string): Promise<PharmacyHit[]> {
   return out;
 }
 
+// Center of a ZIP code (free lookup, cached for a month)
 const zipCoords = async (zip: string): Promise<[number, number] | null> => {
-  return zipCoords(zip);
+  const z = await fetch(`https://api.zippopotam.us/us/${zip}`, { next: { revalidate: 30 * 24 * 3600 } } as RequestInit).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  const p = z?.places?.[0];
+  return p ? [Number(p.latitude), Number(p.longitude)] : null;
 };
 const milesBetween = (a: [number, number], b: [number, number]) => {
   const rad = (d: number) => (d * Math.PI) / 180;
