@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useMe, getUserId } from "@/lib/useMe";
 import { localeFor } from "@/lib/copy";
 import { useCopy, useLang } from "@/lib/i18n";
-import { Screen, BottomNav, Notice, ButtonLink, TimelineTabs } from "@/components/ui";
+import { Screen, BottomNav, Notice, ButtonLink, TimelineTabs, DisplayTitle, roleTone, smallOutlineBtn } from "@/components/ui";
 
 type Block = { start: string; end: string };
 
@@ -48,47 +48,51 @@ export default function SchedulePage() {
 
   return (
     <Screen nav>
+      <DisplayTitle text={S.title} className="mb-2" />
+      <p className="mb-5 text-[15px] text-muted">{hasCalendar ? S.sub : S.noCalendar}</p>
       <TimelineTabs active="calendar" />
-      <h1 className="font-display text-[34px] font-semibold text-navy">{S.title}</h1>
-      <p className="mb-4 text-sm text-muted">{hasCalendar ? S.sub : S.noCalendar}</p>
 
-      <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1">
+      <div className="mb-4 flex gap-1.5">
         {days.map((d) => {
           const dt = new Date(`${d}T12:00:00`);
+          const on = d === day;
+          const visit = me.appointments.find((a) => dayKey(a.slot_start) === d);
           return (
-            <button key={d} type="button" onClick={() => setDay(d)}
-              className={`flex min-w-[46px] flex-col items-center rounded-2xl px-2 py-2 text-xs font-bold ${d === day ? "bg-navy text-white" : "bg-white text-navy border border-line"}`}>
-              <span>{dt.toLocaleDateString(locale, { weekday: "short" })}</span>
-              <span className="text-base">{dt.getDate()}</span>
+            <button key={d} type="button" onClick={() => setDay(d)} aria-pressed={on}
+              className={`flex h-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-[22px] transition ${on ? "bg-navy text-white" : "bg-white text-navy hover:bg-mist"}`}>
+              <span className="text-[12px] font-semibold opacity-80">{dt.toLocaleDateString(locale, { weekday: "narrow" })}</span>
+              <span className="font-display text-[19px] font-bold leading-none">{dt.getDate()}</span>
+              <span className={`h-1.5 w-1.5 rounded-full ${visit ? (on ? "bg-white" : "bg-navy") : "bg-transparent"}`} />
             </button>
           );
         })}
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-3 text-[11px] font-semibold text-muted">
-        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-line" />{S.busy}</span>
-        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-navy" />{S.requested}</span>
+      <div className="mb-3 flex flex-wrap gap-2 text-[12px] font-semibold text-navy">
+        <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5"><span className="h-3 w-3 rounded-full bg-mist ring-1 ring-line" />{S.busy}</span>
+        <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5"><span className="h-3 w-3 rounded-full bg-lavender" />{C.home.tileTherapy}</span>
+        <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5"><span className="h-3 w-3 rounded-full bg-peach" />{C.home.tilePsych}</span>
       </div>
 
-      <div className="relative mb-4 rounded-[30px] bg-white" style={{ height: (END_H - START_H) * PX + 8 }}>
+      <div className="relative mb-5 overflow-hidden rounded-[30px] bg-white" style={{ height: (END_H - START_H) * PX + 16 }}>
         {Array.from({ length: END_H - START_H + 1 }, (_, i) => (
-          <div key={i} className="absolute left-0 right-0 border-t border-line/60" style={{ top: i * PX + 4 }}>
-            <span className="absolute -top-2 left-2 bg-white px-1 text-[10px] text-muted">
+          <div key={i} className="absolute left-0 right-0 border-t border-line" style={{ top: i * PX + 8 }}>
+            <span className="absolute -top-2 left-3 bg-white px-1 text-[11px] font-semibold text-muted">
               {new Date(2026, 0, 1, START_H + i).toLocaleTimeString(locale, { hour: "numeric" })}
             </span>
           </div>
         ))}
         {todaysBusy.map((b, i) => (
-          <div key={`b${i}`} className="absolute left-14 right-3 rounded-lg bg-line/80 px-2 py-1 text-[11px] font-semibold text-muted"
-            style={{ top: top(b.start) + 4, height: height(b.start, b.end) }}>
+          <div key={`b${i}`} className="absolute left-16 right-3 rounded-2xl bg-mist px-3 py-1 text-[12px] font-semibold text-muted"
+            style={{ top: top(b.start) + 8, height: height(b.start, b.end) }}>
             {S.busy} · {t(b.start)}–{t(b.end)}
           </div>
         ))}
         {todaysVisits.map((a) => {
           const end = new Date(new Date(a.slot_start).getTime() + a.duration_min * 60000).toISOString();
           return (
-            <div key={`${a.visit_id ?? a.slot_id}-${a.slot_start}`} className="absolute left-14 right-3 rounded-lg bg-navy px-2 py-1 text-[11px] font-bold text-white"
-              style={{ top: top(a.slot_start) + 4, height: height(a.slot_start, end) }}>
+            <div key={`${a.visit_id ?? a.slot_id}-${a.slot_start}`} className={`absolute left-16 right-3 rounded-2xl px-3 py-1.5 text-[12px] font-bold text-navy ${roleTone(a.provider_type) ?? "bg-mint"}`}
+              style={{ top: top(a.slot_start) + 8, height: height(a.slot_start, end) }}>
               {S.visitWith(a.provider_name, t(a.slot_start))}
             </div>
           );
@@ -97,7 +101,7 @@ export default function SchedulePage() {
 
       {!todaysBusy.length && !todaysVisits.length && <p className="mb-4 text-sm text-muted">{S.empty}</p>}
       <div className="mb-2"><Notice>{S.privacy}</Notice></div>
-      <Link href="/profile" className="text-sm font-semibold text-brand underline">{S.manage}</Link>
+      <Link href="/profile" className={`${smallOutlineBtn} mt-2`}>{S.manage}</Link>
       <BottomNav active="timeline" />
     </Screen>
   );
