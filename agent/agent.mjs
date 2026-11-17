@@ -296,11 +296,15 @@ const agent = defineAgent({
 
     // Show Continuity on FaceTime Video before the session starts (like Chert's video-agent example),
     // so the face is ready when FaceTime is. Never let video break the call.
-    try {
-      const stopAvatar = await startAvatar(ctx.room, () => speaking);
-      ctx.addShutdownCallback(async () => stopAvatar());
-    } catch (e) {
-      console.warn('[avatar] could not publish video, continuing audio-only:', e?.message || e);
+    // The app draws the mascot itself, so web calls skip the video track (faster to start, less work per frame).
+    // Set AGENT_VIDEO=1 to publish it anyway (e.g. for FaceTime through Chert).
+    if (process.env.AGENT_VIDEO === '1') {
+      try {
+        const stopAvatar = await startAvatar(ctx.room, () => speaking);
+        ctx.addShutdownCallback(async () => stopAvatar());
+      } catch (e) {
+        console.warn('[avatar] could not publish video, continuing audio-only:', e?.message || e);
+      }
     }
     session = await openSession({ resumed: false });
     // The caller is connected and listening: greet right away, in the language they picked in the app

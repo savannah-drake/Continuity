@@ -24,7 +24,7 @@ const T = {
       { title: "Support", ex: "I'm not doing great today" },
     ],
     voice: "Start a voice call", type: "Type instead",
-    connecting: "Connecting…", ended: "Chat ended", listening: "Listening", thinking: "Thinking", speaking: "Speaking", waiting: "Joining…",
+    connecting: "Connecting…", connected: "Connected", ended: "Chat ended", listening: "Listening", thinking: "Thinking", speaking: "Speaking", waiting: "Joining…",
     mute: "Mute", unmute: "Unmute", end: "End", again: "Start again", home: "Home",
     placeholder: "Type a message", send: "Send", soundOn: "Sound on", soundOff: "Sound off", switchType: "Type instead", switchTalk: "Talk instead",
     micBlocked: "Your browser blocked the microphone. Allow it in the address bar, or type instead.",
@@ -46,7 +46,7 @@ const T = {
       { title: "Apoyo", ex: "Hoy no me siento bien" },
     ],
     voice: "Iniciar llamada de voz", type: "Escribir",
-    connecting: "Conectando…", ended: "Chat terminado", listening: "Escuchando", thinking: "Pensando", speaking: "Hablando", waiting: "Entrando…",
+    connecting: "Conectando…", connected: "Conectado", ended: "Chat terminado", listening: "Escuchando", thinking: "Pensando", speaking: "Hablando", waiting: "Entrando…",
     mute: "Silenciar", unmute: "Activar micrófono", end: "Terminar", again: "Empezar otra vez", home: "Inicio",
     placeholder: "Escribe un mensaje", send: "Enviar", soundOn: "Sonido sí", soundOff: "Sonido no", switchType: "Escribir", switchTalk: "Hablar",
     micBlocked: "Tu navegador bloqueó el micrófono. Permítelo en la barra de direcciones o escribe.",
@@ -68,7 +68,7 @@ const T = {
       { title: "支持", ex: "我今天状态不太好" },
     ],
     voice: "开始语音通话", type: "改为打字",
-    connecting: "正在连接…", ended: "聊天已结束", listening: "正在听", thinking: "正在想", speaking: "正在说", waiting: "正在加入…",
+    connecting: "正在连接…", connected: "已连接", ended: "聊天已结束", listening: "正在听", thinking: "正在想", speaking: "正在说", waiting: "正在加入…",
     mute: "静音", unmute: "取消静音", end: "结束", again: "重新开始", home: "首页",
     placeholder: "输入消息", send: "发送", soundOn: "开声音", soundOff: "关声音", switchType: "改为打字", switchTalk: "改为说话",
     micBlocked: "浏览器阻止了麦克风。请在地址栏允许，或改为打字。",
@@ -95,14 +95,55 @@ export default function CallPage() {
   const [agentState, setAgentState] = useState<string>("waiting");
   const [muted, setMuted] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
-  const [hasVideo, setHasVideo] = useState(false);
   const [secs, setSecs] = useState(0);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const roomRef = useRef<any>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const audioBox = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const humRef = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null);
+
+  // A soft, slow chord while the call connects; fades out as soon as Continuity starts talking.
+  function startHum() {
+    try {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx: AudioContext = new AC();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 1.5);
+      gain.connect(ctx.destination);
+      // A calm major chord (F, A, C), gently breathing in and out
+      [174.6, 220.0, 261.6].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const v = ctx.createGain();
+        v.gain.value = 0.33;
+        const lfo = ctx.createOscillator();
+        const depth = ctx.createGain();
+        lfo.frequency.value = 0.12 + i * 0.05;
+        depth.gain.value = 0.18;
+        lfo.connect(depth).connect(v.gain);
+        osc.connect(v).connect(gain);
+        osc.start(); lfo.start();
+      });
+      humRef.current = { ctx, gain };
+      setTimeout(stopHum, 25000); // never longer than this
+    } catch { /* no Web Audio: stay quiet */ }
+  }
+  function stopHum() {
+    const h = humRef.current;
+    if (!h) return;
+    humRef.current = null;
+    try {
+      h.gain.gain.cancelScheduledValues(h.ctx.currentTime);
+      h.gain.gain.setValueAtTime(h.gain.gain.value, h.ctx.currentTime);
+      h.gain.gain.linearRampToValueAtTime(0, h.ctx.currentTime + 0.8);
+      setTimeout(() => h.ctx.close().catch(() => {}), 1000);
+    } catch { /* already closed */ }
+  }
+  useEffect(() => { if (agentState === "speaking" || phase === "ended" || phase === "error") stopHum(); }, [agentState, phase]);
+  useEffect(() => () => stopHum(), []);
 
   useEffect(() => {
     if (phase !== "live") return;
@@ -135,6 +176,7 @@ export default function CallPage() {
     setDraft(prefill);
     setAgentState("waiting");
     setSoundOn(m === "voice");
+    if (m === "voice") startHum(); // started inside the tap, so the browser lets it play
     try {
       const res = await fetch("/api/call/token", {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lang, mode: m }),
@@ -152,9 +194,6 @@ export default function CallPage() {
           const el = track.attach() as HTMLAudioElement;
           el.muted = m !== "voice";
           audioBox.current?.appendChild(el);
-        } else if (track.kind === Track.Kind.Video && videoRef.current) {
-          track.attach(videoRef.current);
-          setHasVideo(true);
         }
       });
       room.on(RoomEvent.TrackUnsubscribed, (track: any) => { track.detach().forEach((el: HTMLElement) => el.remove?.()); });
@@ -162,7 +201,7 @@ export default function CallPage() {
         const s = participant?.attributes?.["lk.agent.state"];
         if (s) setAgentState(s);
       });
-      room.on(RoomEvent.Disconnected, () => { setPhase((p) => (p === "error" ? p : "ended")); setHasVideo(false); });
+      room.on(RoomEvent.Disconnected, () => { setPhase((p) => (p === "error" ? p : "ended")); });
 
       // What's said, as text: the agent's replies and (in voice calls) the caller's own words
       room.registerTextStreamHandler("lk.transcription", async (reader: any) => {
@@ -299,14 +338,13 @@ export default function CallPage() {
 
       {mode === "voice" ? (
         <div className="relative w-full shrink-0 overflow-hidden rounded-[30px] bg-lavender" style={{ aspectRatio: "4 / 3.4" }}>
-          <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 h-full w-full object-contain ${hasVideo ? "" : "hidden"}`} />
-          {!hasVideo && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src="/mascot-lavender.png" alt="" className={`absolute inset-0 m-auto h-2/3 w-2/3 object-contain ${phase === "connecting" ? "animate-pulse" : "mascot-float"}`} />
-          )}
-          {phase === "live" && agentState === "speaking" && (
-            <span className="absolute bottom-4 left-1/2 h-1.5 w-16 -translate-x-1/2 rounded-full bg-navy/60" aria-hidden />
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/mascot-lavender.png" alt="" className={`absolute inset-0 m-auto h-2/3 w-2/3 object-contain ${phase === "connecting" ? "animate-pulse" : agentState === "speaking" ? "mascot-float" : ""}`} />
+          {/* Connected, right in front of the mascot */}
+          <span className="absolute bottom-5 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-white px-4 py-2 text-[14px] font-bold text-navy shadow-[0_6px_18px_rgba(42,36,56,0.12)]" aria-live="polite">
+            <span className={`h-2.5 w-2.5 rounded-full ${phase === "live" ? "bg-live" : "animate-pulse bg-attn"}`} aria-hidden />
+            {phase === "live" ? (agentState === "speaking" ? L.speaking : L.connected) : L.connecting}
+          </span>
         </div>
       ) : (
         <div className="mb-1 flex items-center gap-3">
