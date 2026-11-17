@@ -1,4 +1,4 @@
-// POST /api/call/token {lang} (signed in) -> { url, token, room } for "Talk to Continuity" in the browser.
+// POST /api/call/token {lang, mode: "voice" | "text"} (signed in) -> { url, token, room } for "Talk to Continuity" in the browser.
 import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 import { callToken, livekitConfigured } from "@/lib/livekit";
 import { query } from "@/lib/db";
@@ -14,5 +14,6 @@ export async function POST(req: Request) {
 FROM users u
 WHERE u.user_id = $1`, [userId]);
   const lang: Lang = isLang(body?.lang) ? body.lang : isLang(u?.preferred_language) ? u!.preferred_language : "en";
-  return Response.json(callToken({ userId, name: u?.display_name, lang }));
+  const mode = body?.mode === "text" ? "text" : "voice";
+  return Response.json(callToken({ userId, name: u?.display_name, lang, mode }));
 }

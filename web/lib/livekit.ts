@@ -8,13 +8,13 @@ const b64url = (v: object | Buffer) => (Buffer.isBuffer(v) ? v : Buffer.from(JSO
 export const livekitConfigured = () =>
   Boolean(process.env.LIVEKIT_URL && process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_API_SECRET);
 
-export function callToken(opts: { userId: number; name?: string | null; lang: "en" | "es" | "zh"; agentName?: string; ttlSec?: number }) {
+export function callToken(opts: { userId: number; name?: string | null; lang: "en" | "es" | "zh"; mode?: "voice" | "text"; agentName?: string; ttlSec?: number }) {
   const key = process.env.LIVEKIT_API_KEY!;
   const secret = process.env.LIVEKIT_API_SECRET!;
   const room = `continuity-web-${opts.userId}-${randomBytes(4).toString("hex")}`;
   const identity = `user-${opts.userId}-${randomBytes(3).toString("hex")}`;
   const now = Math.floor(Date.now() / 1000);
-  const metadata = JSON.stringify({ userId: opts.userId, channel: "web", lang: opts.lang, name: opts.name ?? null });
+  const metadata = JSON.stringify({ userId: opts.userId, channel: "web", lang: opts.lang, name: opts.name ?? null, mode: opts.mode ?? "voice" });
   const claims = {
     iss: key,
     sub: identity,

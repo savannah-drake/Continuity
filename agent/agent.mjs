@@ -18,9 +18,9 @@ const FALLBACK_USER_ID = Number(process.env.CONTINUITY_USER_ID || 0) || null;
 function callInfo(ctx) {
   try {
     const m = JSON.parse(ctx.job?.metadata || '{}');
-    if (Number.isInteger(m.userId) && m.userId > 0) return { userId: m.userId, channel: m.channel || 'web', lang: LANG_NAMES[m.lang] ? m.lang : 'en', name: m.name || null };
+    if (Number.isInteger(m.userId) && m.userId > 0) return { userId: m.userId, channel: m.channel || 'web', lang: LANG_NAMES[m.lang] ? m.lang : 'en', name: m.name || null, mode: m.mode === 'text' ? 'text' : 'voice' };
   } catch { /* not JSON: a Chert call */ }
-  return { userId: FALLBACK_USER_ID, channel: 'other', lang: null, name: null };
+  return { userId: FALLBACK_USER_ID, channel: 'other', lang: null, name: null, mode: 'voice' };
 }
 
 async function api(path, init = {}) {
@@ -64,6 +64,9 @@ const webGreeting = (lang) => lang === 'zh'
   ? "Habla en voz baja y con calma. No llames a ninguna herramienta todavía: usa el estado de atención que ya tienes. Saluda por su nombre en español, di que eres una asistente de IA, no médica ni enfermera, y pregunta en qué le puedes ayudar. Si algo es urgente, ofrece empezar por ahí. Puede cambiar a inglés cuando quiera."
   : "Speak softly and calmly. Don't call any tools yet: use the care status you already have. Greet them by name in English, say you're an AI assistant, not a doctor or a nurse, and ask what they'd like help with. If something is urgent, offer to start there. They can switch to Spanish any time.";
 
+// Typed chat: same agent, the person reads the replies on screen
+const TEXT_MODE_NOTE = "\n\nThis conversation is typed, not spoken: the person reads your replies on their screen and types back. Keep replies short (one to three sentences), plain, and easy to skim. Don't mention voices or hearing.";
+
 function makeTools(USER_ID) {
   return {
     get_care_status: llm.tool({
@@ -85,6 +88,42 @@ function makeTools(USER_ID) {
           resources: (data.resources || []).map((r) => ({ name: spanish ? r.name_es : r.name, how: spanish ? r.how_es : r.how, open_24_7: r.available_24_7 })),
         };
       },
+    }),
+    picked_up_refill: llm.tool({
+      description: "The caller says they picked up a refill of one medication. Restarts that medication's countdown (a new fill). Use the medication id from get_care_status (all_medications[].id). Confirm which medication first if they take more than one.",
+      parameters: z.object({ medication_id: z.number().describe('all_medications[].id from get_care_status') }),
+      execute: async ({ medication_id }) => USER_ID
+        ? api('/api/agent/actions', { method: 'POST', body: JSON.stringify({ userId: USER_ID, action: 'refilled', medicationId: medication_id }) })
+        : { ok: false, say: 'Say they can mark it in the app under My care.' },
+    }),
+    prescription_sent: llm.tool({
+      description: "The caller says their prescriber sent the new prescription to the pharmacy (usually after a psychiatry visit). Marks it so Continuity moves on to pickup.",
+      parameters: z.object({}),
+      execute: async () => USER_ID
+        ? api('/api/agent/actions', { method: 'POST', body: JSON.stringify({ userId: USER_ID, action: 'rx_sent' }) })
+        : { ok: false, say: 'Say they can mark it in the app under My care.' },
+    }),
+    add_medication: llm.tool({
+      description: "Add a medication the caller tells you about, so Continuity tracks when it runs out. You need its name and about how many days are left; ask for refills left and whether their prescriber needs to see them to renew only if they know. Read it back, then call this on a clear yes.",
+      parameters: z.object({
+        name: z.string().describe('the medication as they say it, e.g. "Lexapro 10 mg"'),
+        days_left: z.number().describe('days of supply left'),
+        refills_left: z.number().optional(),
+        needs_visit_to_renew: z.boolean().optional(),
+      }),
+      execute: async ({ name, days_left, refills_left, needs_visit_to_renew }) => USER_ID
+        ? api('/api/agent/actions', { method: 'POST', body: JSON.stringify({ userId: USER_ID, action: 'add_medication', label: name, daysLeft: days_left, refills: refills_left, needsVisit: needs_visit_to_renew }) })
+        : { ok: false, say: 'Say they can add it in the app under My care.' },
+    }),
+    send_to_phone: llm.tool({
+      description: "Send the caller a link as a notification (and email, if they turned that on) so they can act after the call: 'booking' = their psychiatrist's or therapist's booking page (or Find someone new if they have none), 'pharmacy' = their pharmacy's number to tap and call, 'find' = directories filtered for their insurance. Offer this whenever they need to book or call someone.",
+      parameters: z.object({
+        what: z.enum(['booking', 'pharmacy', 'find']),
+        role: z.enum(['psychiatrist', 'therapist']).optional().describe('for booking: whose booking page'),
+      }),
+      execute: async ({ what, role }) => USER_ID
+        ? api('/api/agent/actions', { method: 'POST', body: JSON.stringify({ userId: USER_ID, action: 'send_link', what, role }) })
+        : { ok: false, say: 'Say the links are in the app under My care.' },
     }),
     add_visit: llm.tool({
       description: "Save a visit the caller says they already booked (with their therapist or psychiatrist, on Zocdoc, Grow, by phone, anywhere). It goes in the app and on their Google Calendar. Use today's date from get_care_status to turn \"Tuesday at 4\" into a date. Repeat back the day and time first, then call this when they say yes.",
@@ -228,17 +267,17 @@ const agent = defineAgent({
       if (resumed) { try { ctx.room.unregisterByteStreamHandler('lk.agent.session'); } catch {} }
       await s.start({
         room: ctx.room,
-        agent: new voice.Agent({ instructions: instructions + statusNote + languageLock(call.lang) + (resumed ? RESUME_NOTE : ''), tools }),
+        agent: new voice.Agent({ instructions: instructions + statusNote + languageLock(call.lang) + (call.mode === 'text' ? TEXT_MODE_NOTE : '') + (resumed ? RESUME_NOTE : ''), tools }),
         record: false,
         inputOptions: {
           participantIdentity: caller.identity,
           audioEnabled: true,
           videoEnabled: false,
-          textEnabled: false,
+          textEnabled: true, // typed messages from the app (topic lk.chat)
           closeOnDisconnect: true,
           deleteRoomOnClose: false,
         },
-        outputOptions: { audioEnabled: true, transcriptionEnabled: false },
+        outputOptions: { audioEnabled: true, transcriptionEnabled: true }, // the app shows what's said
       });
       if (resumed) s.generateReply({ instructions: RESUME_LINE });
       return s;

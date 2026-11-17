@@ -50,3 +50,14 @@ export async function sendEmail(to: string, a: Alert, footer: string) {
   if (!res?.ok) console.error("email failed", res?.status, await res?.text().catch(() => ""));
   return !!res?.ok;
 }
+
+// Push to every device they turned on, plus email if they turned that on. Returns true if anything went out.
+export async function notifyUser(userId: number, a: Alert, emailFooter = "") {
+  const pushed = await sendPush(userId, a).catch(() => 0);
+  const [u] = await query<{ alert_email: boolean; email: string | null }>(
+`SELECT u.alert_email, u.email
+FROM users u
+WHERE u.user_id = $1`, [userId]).catch(() => []);
+  const emailed = u?.alert_email && u.email ? await sendEmail(u.email, a, emailFooter).catch(() => false) : false;
+  return pushed > 0 || emailed;
+}
