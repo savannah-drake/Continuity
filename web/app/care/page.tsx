@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCopy } from "@/lib/i18n";
-import { useMe, visitLine, fmtShort, fmtSlot, type MedTimeline, type CareMember } from "@/lib/useMe";
+import { useMe, visitLine, fmtShort, fmtSlot, type MedTimeline, type CareMember, type Pharmacy } from "@/lib/useMe";
 import { SuggestInput } from "@/components/Suggest";
 import { Screen, Field, inputClass, BottomNav } from "@/components/ui";
 import { ExternalIcon, PhoneIcon, PlusIcon } from "@/components/icons";
@@ -45,6 +45,17 @@ export default function CarePage() {
   const [findKind, setFindKind] = useState<"psychiatrist" | "therapist">("psychiatrist");
   const [findPlan, setFindPlan] = useState<string | null>(null);
   const [askBooked, setAskBooked] = useState<number | null>(null);
+  const [pharmForm, setPharmForm] = useState<null | { name: string; phone: string; address: string }>(null);
+  const [personEdit, setPersonEdit] = useState<null | { id: number; d: PersonDraft }>(null);
+  // Check-ins: "Did you pick up your refill?" and, after a psychiatry visit, "Did they send your prescription?"
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [rxNotYet, setRxNotYet] = useState(false);
+  const [pickupFor, setPickupFor] = useState<number | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const id = Number(q.get("pickup"));
+    if (id) setPickupFor(id);
+  }, []);
   // Calendar events like "Appointment with Antionette Holt" that might be visits (only when auto-import is on)
   const [suggestions, setSuggestions] = useState<{ eventId: string; name: string; startsAt: string }[]>([]);
   const autoImport = !!me?.user.auto_import_visits;
@@ -119,6 +130,46 @@ export default function CarePage() {
         </div>
       ))}
 
+      {/* After a psychiatry visit: did the prescription go out? */}
+      {(() => {
+        const pv = me.lastPsychVisit;
+        if (!pv || hidden.includes("rx") || me.medications.length === 0 || me.medications.some((m) => m.rxSentOn && m.rxSentOn >= pv.date)) return null;
+        const office = me.careTeam.find((c) => c.role === "psychiatrist" && c.phone && (!pv.who || c.provider_name === pv.who)) ?? me.careTeam.find((c) => c.role === "psychiatrist" && c.phone);
+        const soonest = me.medications[0];
+        return (
+          <div className="mb-6 rounded-2xl border border-brand bg-white px-4 py-3">
+            <p className="font-semibold text-navy">{K.afterVisitQ(pv.who)}</p>
+            {!rxNotYet ? (
+              <div className="mt-3 flex gap-4 text-sm font-semibold">
+                <button className="text-brand" disabled={busy} onClick={async () => { if (await send("/api/medications/rx-sent", "POST")) setHidden((h) => [...h, "rx"]); }}>{K.yesSent}</button>
+                <button className="text-muted" onClick={() => setRxNotYet(true)}>{K.notSent}</button>
+              </div>
+            ) : (
+              <div className="mt-2 text-sm">
+                <p className="font-semibold text-navy">{K.callScriptTitle}</p>
+                <p className="mb-3 text-muted">{K.callScript(fmtShort(pv.date), fmtShort(soonest.supplyEndDate))}</p>
+                <div className="flex gap-4 font-semibold">
+                  {office?.phone && <a href={`tel:${office.phone}`} className={linkBtn}><PhoneIcon size={16} />{K.callOffice}</a>}
+                  <button className="text-muted" onClick={() => setHidden((h) => [...h, "rx"])}>{K.cancel}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Run-out day: did you pick up the refill? */}
+      {me.medications.filter((m) => !hidden.includes(`pickup${m.medicationId}`) && (pickupFor === m.medicationId || (m.daysLeft <= 1 && !(m.bookApptBy && !m.visitBooked) && !(m.requestRxBy && !m.rxSentOn)))).map((m) => (
+        <div key={`pickup${m.medicationId}`} className="mb-4 rounded-2xl border border-brand bg-white px-4 py-3">
+          <p className="font-semibold text-navy">{K.didPickUp(m.label)}</p>
+          <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
+            <button className="text-brand" disabled={busy} onClick={async () => { if (await send("/api/medications/refilled", "POST", { medicationId: m.medicationId })) { setHidden((h) => [...h, `pickup${m.medicationId}`]); setNote(K.pickedUpDone); } }}>{K.yesPickedUp}</button>
+            {m.pharmacy?.phone && <a href={`tel:${m.pharmacy.phone}`} className={linkBtn}><PhoneIcon size={16} />{K.callPharmacy(m.pharmacy.name)}</a>}
+            <button className="text-muted" onClick={() => setHidden((h) => [...h, `pickup${m.medicationId}`])}>{K.notYet}</button>
+          </div>
+        </div>
+      ))}
+
       {/* Medications */}
       <Section title={K.meds} action={!medForm && <button className={linkBtn} onClick={() => setMedForm({ m: emptyMed() })}><PlusIcon size={16} />{K.addMed}</button>}>
         {me.medications.length === 0 && !medForm && <p className="text-sm text-muted">{K.medsEmpty}</p>}
@@ -131,9 +182,19 @@ export default function CarePage() {
                   <p className="font-semibold text-navy">{m.label}</p>
                   <p className="text-sm text-muted">
                     {K.daysLeftShort(m.daysLeft)} · {K.runsOut(fmtShort(m.supplyEndDate))}
-                    {m.bookApptBy && !m.visitBooked ? ` · ${visitLine(m, me.today, K, fmtShort)}` : ""}
+                    {m.rxSentOn ? ` · ${K.rxSentLine(m.pharmacy?.name ?? null)}`
+                      : m.bookApptBy && !m.visitBooked ? ` · ${visitLine(m, me.today, K, fmtShort)}`
+                      : m.requestRxBy && m.nextAction === "request_rx" ? ` · ${K.requestRxBy(fmtShort(m.requestRxBy))}` : ""}
                   </p>
+                  {m.pharmacy && (
+                    <p className="text-xs text-muted">{K.medPharmacy}: {m.pharmacy.name}
+                      {m.pharmacy.phone && <a href={`tel:${m.pharmacy.phone}`} className="ml-2 font-semibold text-brand" aria-label={K.callPharmacy(m.pharmacy.name)}>{K.call}</a>}
+                    </p>
+                  )}
+                  {m.controlled && <p className="text-xs text-muted">{K.controlledNote}</p>}
                   {m.reminderTime && <p className="text-xs text-muted">{K.reminderAt(m.reminderTime)}</p>}
+                  <button className="mt-1 text-xs font-semibold text-brand" disabled={busy}
+                    onClick={async () => { if (await send("/api/medications/refilled", "POST", { medicationId: m.medicationId })) setNote(K.pickedUpDone); }}>{K.pickedUp}</button>
                 </div>
                 <div className="flex shrink-0 gap-3 text-sm">
                   <button className="font-semibold text-brand" onClick={() => setMedForm({ id: m.medicationId, m: medToDraft(m) })}>{K.editMed}</button>
@@ -144,11 +205,45 @@ export default function CarePage() {
           </ul>
         )}
         {medForm && (
-          <MedEditor draft={medForm.m} busy={busy} onCancel={() => setMedForm(null)}
+          <MedEditor draft={medForm.m} pharmacies={me.pharmacies} busy={busy} onCancel={() => setMedForm(null)}
             onSave={async (d) => {
               const ok = await send("/api/medications", medForm.id ? "PATCH" : "POST", { ...draftToMed(d), ...(medForm.id ? { medicationId: medForm.id } : {}) });
               if (ok) setMedForm(null);
             }} />
+        )}
+      </Section>
+
+      {/* Pharmacies */}
+      <Section title={K.pharmacies} action={!pharmForm && <button className={linkBtn} onClick={() => setPharmForm({ name: "", phone: "", address: "" })}><PlusIcon size={16} />{K.addPharmacy}</button>}>
+        {me.pharmacies.length === 0 && !pharmForm && <p className="text-sm text-muted">{K.pharmaciesEmpty}</p>}
+        {me.pharmacies.length > 0 && (
+          <ul className={rowList}>
+            {me.pharmacies.map((p) => (
+              <li key={p.pharmacy_id} className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-navy">{p.pharmacy_name}{p.preferred && <span className="ml-2 text-xs font-normal text-muted">{K.preferred}</span>}</p>
+                  {p.address && <p className="truncate text-sm text-muted">{p.address}</p>}
+                </div>
+                <div className="flex shrink-0 items-center gap-4 text-sm">
+                  {p.phone && <a href={`tel:${p.phone}`} className={linkBtn} aria-label={K.callPharmacy(p.pharmacy_name)}><PhoneIcon size={16} /></a>}
+                  {!p.preferred && <button className="font-semibold text-brand" disabled={busy} onClick={() => send("/api/pharmacies", "PATCH", { pharmacyId: p.pharmacy_id, preferred: true })}>{K.makePreferred}</button>}
+                  <button className="text-muted" disabled={busy} onClick={() => send(`/api/pharmacies?id=${p.pharmacy_id}`, "DELETE")}>{K.remove}</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {pharmForm && (
+          <form className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={async (e) => {
+            e.preventDefault();
+            if (!pharmForm.name.trim()) return;
+            if (await send("/api/pharmacies", "POST", pharmForm)) setPharmForm(null);
+          }}>
+            <Field label={K.pharmacyName}><input className={inputClass} value={pharmForm.name} onChange={(e) => setPharmForm({ ...pharmForm, name: e.target.value })} placeholder="CVS Pharmacy, N Decatur Rd" /></Field>
+            <Field label={K.pharmacyPhone}><input className={inputClass} type="tel" value={pharmForm.phone} onChange={(e) => setPharmForm({ ...pharmForm, phone: e.target.value })} /></Field>
+            <Field label={K.pharmacyAddress}><input className={inputClass} value={pharmForm.address} onChange={(e) => setPharmForm({ ...pharmForm, address: e.target.value })} /></Field>
+            <Buttons busy={busy} onCancel={() => setPharmForm(null)} />
+          </form>
         )}
       </Section>
 
@@ -167,11 +262,16 @@ export default function CarePage() {
                   {c.booking_url && <a href={c.booking_url} target="_blank" rel="noopener noreferrer" className={linkBtn}
                     onClick={() => { setAskBooked(null); setTimeout(() => setBookingWith(c.member_id), 300); }}>{K.book}<ExternalIcon size={14} /></a>}
                   {c.phone && <a href={`tel:${c.phone}`} className={linkBtn} aria-label={K.call}><PhoneIcon size={16} /></a>}
+                  <button className="font-semibold text-brand" onClick={() => setPersonEdit({ id: c.member_id, d: { bookingUrl: c.booking_url ?? "", role: (c.role as PersonDraft["role"]) ?? "other", providerName: c.provider_name ?? "", phone: c.phone ?? "", video: c.video } })}>{K.edit}</button>
                   <button className="text-muted" disabled={busy} onClick={() => send(`/api/care-team?id=${c.member_id}`, "DELETE")}>{K.remove}</button>
                 </div>
               </li>
             ))}
           </ul>
+        )}
+        {personEdit && (
+          <PersonEditor key={personEdit.id} draft={personEdit.d} busy={busy} onCancel={() => setPersonEdit(null)}
+            onSave={async (d) => { const ok = await send("/api/care-team", "PATCH", { ...d, memberId: personEdit.id }); if (ok) setPersonEdit(null); }} />
         )}
         {personForm && (
           <PersonEditor draft={personForm} busy={busy} onCancel={() => setPersonForm(null)}
@@ -248,12 +348,13 @@ function memberName(c: CareMember, roles: Record<string, string>) {
 }
 
 // ---- Medication editor
-type MedDraft = { label: string; days: number; refills: number; expires: string; needsVisit: boolean; lead: number; reminder: string };
-const emptyMed = (): MedDraft => ({ label: "", days: 30, refills: 0, expires: "", needsVisit: true, lead: 14, reminder: "" });
-const medToDraft = (m: MedTimeline): MedDraft => ({ label: m.label, days: m.daysLeft, refills: m.refillsRemaining, expires: m.rxExpiresOn ?? "", needsVisit: m.requiresAppointmentForRenewal, lead: m.bookingLeadDays, reminder: m.reminderTime ?? "" });
+type MedDraft = { label: string; days: number; refills: number; expires: string; needsVisit: boolean; lead: number; reminder: string; fillDays: number; pharmacyId: number | null };
+const emptyMed = (): MedDraft => ({ label: "", days: 30, refills: 0, expires: "", needsVisit: true, lead: 14, reminder: "", fillDays: 30, pharmacyId: null });
+const medToDraft = (m: MedTimeline): MedDraft => ({ label: m.label, days: m.daysLeft, refills: m.refillsRemaining, expires: m.rxExpiresOn ?? "", needsVisit: m.requiresAppointmentForRenewal, lead: m.bookingLeadDays, reminder: m.reminderTime ?? "", fillDays: m.fillDays, pharmacyId: m.pharmacyId });
 const draftToMed = (d: MedDraft) => ({
   label: d.label, daysSupplyRemaining: d.days, refillsRemaining: d.refills, rxExpiresOn: d.expires || null,
   requiresAppointmentForRenewal: d.needsVisit, bookingLeadDays: d.lead, reminderTime: d.reminder || null,
+  fillDays: d.fillDays, pharmacyId: d.pharmacyId,
 });
 
 function Buttons({ busy, onCancel }: { busy: boolean; onCancel: () => void }) {
@@ -266,7 +367,7 @@ function Buttons({ busy, onCancel }: { busy: boolean; onCancel: () => void }) {
   );
 }
 
-function MedEditor({ draft, busy, onSave, onCancel }: { draft: MedDraft; busy: boolean; onSave: (d: MedDraft) => void; onCancel: () => void }) {
+function MedEditor({ draft, pharmacies, busy, onSave, onCancel }: { draft: MedDraft; pharmacies: Pharmacy[]; busy: boolean; onSave: (d: MedDraft) => void; onCancel: () => void }) {
   const K = useCopy().care;
   const [d, setD] = useState(draft);
   return (
@@ -276,7 +377,16 @@ function MedEditor({ draft, busy, onSave, onCancel }: { draft: MedDraft; busy: b
         <Field label={K.medDays}><input className={inputClass} type="number" min={0} value={d.days} onChange={(e) => setD({ ...d, days: Number(e.target.value) })} /></Field>
         <Field label={K.medRefills}><input className={inputClass} type="number" min={0} value={d.refills} onChange={(e) => setD({ ...d, refills: Number(e.target.value) })} /></Field>
       </div>
+      <Field label={K.medFillDays}><input className={inputClass} type="number" min={1} max={180} value={d.fillDays} onChange={(e) => setD({ ...d, fillDays: Number(e.target.value) })} /></Field>
       <Field label={K.medExpires}><input className={inputClass} type="date" value={d.expires} onChange={(e) => setD({ ...d, expires: e.target.value })} /></Field>
+      {pharmacies.length > 0 && (
+        <Field label={K.medPharmacy}>
+          <select className={inputClass} value={d.pharmacyId ?? ""} onChange={(e) => setD({ ...d, pharmacyId: e.target.value ? Number(e.target.value) : null })}>
+            <option value="">{K.usePreferred}</option>
+            {pharmacies.map((p) => <option key={p.pharmacy_id} value={p.pharmacy_id}>{p.pharmacy_name}</option>)}
+          </select>
+        </Field>
+      )}
       <label className="flex items-center gap-2 text-sm text-navy">
         <input type="checkbox" className="h-4 w-4 accent-[#5AA9D8]" checked={d.needsVisit} onChange={(e) => setD({ ...d, needsVisit: e.target.checked })} />
         {K.medNeedsVisit}

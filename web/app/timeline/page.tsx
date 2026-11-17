@@ -8,6 +8,7 @@ type Dot = "today" | "confirmed" | "action" | "end" | "later";
 const dotColor: Record<Dot, string> = {
   today: "border-brand", confirmed: "border-forest", action: "border-attn", end: "border-coral", later: "border-muted",
 };
+const addDaysIso = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
 type Step = { date: string; title: string; body?: string; dot: Dot; tag?: { text: string; tone: "mint" | "attn" } };
 
 export default function TimelinePage() {
@@ -39,6 +40,16 @@ export default function TimelinePage() {
     const gap = !!m.visitDate && m.visitDate >= m.rxNeededBy;
     if (m.bookApptBy || m.rxNeededBy >= me.today) steps.push({ date: rxDate, title: many ? `${T.rxNeededBy} · ${m.label}` : T.rxNeededBy, body: m.visitDate ? T.rxAfterVisit : T.rxNeededByBody, dot: "later" });
     steps.push({ date: m.supplyEndDate, title: T.supplyEnd(m.label), body: gap ? T.gapWarning : T.supplyEndBody, dot: "end" });
+    // Controlled medication without a visit: ask the prescriber for this fill's prescription
+    if (m.requestRxBy && !m.rxSentOn) {
+      steps.push({ date: m.requestRxBy < me.today ? me.today : m.requestRxBy, title: many ? `${T.requestRx} · ${m.label}` : T.requestRx,
+        body: T.requestRxBody, dot: "action", tag: { text: COPY.tags.needsAction, tone: "attn" } });
+    }
+    // Controlled medication: call the pharmacy 3 days before running out (shortages)
+    const stockDay = addDaysIso(m.supplyEndDate, -3);
+    if (m.controlled && stockDay >= me.today) steps.push({ date: stockDay, title: T.stockCheck(m.pharmacy?.name ?? null), body: T.stockCheckBody, dot: "later" });
+    // Once the prescription is sent: pick it up before the last day
+    if (m.rxSentOn) steps.push({ date: m.refillDeadline < me.today ? me.today : m.refillDeadline, title: T.pickupStep, body: m.pharmacy?.name, dot: "later" });
   }
   if (me.therapy && !me.therapy.sessionBooked) {
     steps.push({ date: me.therapy.bookBy < me.today ? me.today : me.therapy.bookBy, title: T.therapyBookBy,

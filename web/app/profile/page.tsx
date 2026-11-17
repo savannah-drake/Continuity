@@ -9,6 +9,7 @@ import { localeFor } from "@/lib/copy";
 import { useCopy, useLang, setLang } from "@/lib/i18n";
 import { PLANS } from "@/lib/copy";
 import { AlertSettings } from "@/components/AlertSettings";
+import { TrustedPerson } from "@/components/TrustedPerson";
 import { Screen, Button, ButtonLink, Field, BottomNav, inputClass } from "@/components/ui";
 
 type CalStatus = { upcomingBusy: number; fileBusy?: number; google?: { connected: boolean; lastSynced?: string | null; needsReconnect?: boolean } };
@@ -22,7 +23,7 @@ function ProfilePage() {
   const P = C.profile;
   const lang = useLang();
   const router = useRouter();
-  const { me, state } = useMe();
+  const { me, state, reload } = useMe();
   const [name, setName] = useState("");
   const [plan, setPlan] = useState("");
   const [zip, setZip] = useState("");
@@ -209,12 +210,25 @@ function ProfilePage() {
         {calNote && <p className="mt-2 text-sm text-muted">{calNote}</p>}
       </section>
       {me && <AlertSettings emailOn={!!me.user.alert_email} email={me.user.email} />}
+      {me && <TrustedPerson current={me.trusted} onChange={reload} />}
 
       <p className="mb-6 text-xs text-muted">{P.privacy}</p>
 
       <div className="mb-2 flex justify-between text-sm font-semibold">
         <Link href="/onboarding" className="text-brand underline">{P.redo}</Link>
         <button type="button" onClick={signOut} className="text-muted underline">{P.signOut}</button>
+      </div>
+      <div className="mb-2 mt-6 flex items-center justify-between text-xs">
+        <span className="flex gap-4 text-muted">
+          <Link href="/privacy" className="underline">{P.privacyLink}</Link>
+          <Link href="/terms" className="underline">{P.termsLink}</Link>
+        </span>
+        <button type="button" className="text-coral underline" onClick={async () => {
+          if (!window.confirm(P.deleteConfirm)) return;
+          await fetch("/api/account", { method: "DELETE" }).catch(() => null);
+          try { localStorage.clear(); } catch { /* private mode */ }
+          router.push("/");
+        }}>{P.deleteAccount}</button>
       </div>
       <BottomNav active="profile" />
     </Screen>

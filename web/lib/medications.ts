@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { pool, query } from "./db";
 import { getConnection, createEvent, updateEvent, deleteEvent } from "./google";
 import { getMe } from "./me";
+import { isScheduleII } from "./controlled";
 
 export type MedInput = {
   label: string;
@@ -14,6 +15,8 @@ export type MedInput = {
   requiresAppointmentForRenewal: boolean;
   bookingLeadDays: number;
   reminderTime?: string | null; // "HH:MM" (24h) or null for no daily reminder
+  pharmacyId?: number | null;   // null = your preferred pharmacy
+  fillDays: number;             // how long one fill lasts
 };
 
 const todayET = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
@@ -31,6 +34,8 @@ export function cleanMed(raw: any): MedInput | null {
     requiresAppointmentForRenewal: raw?.requiresAppointmentForRenewal !== false,
     bookingLeadDays: Math.max(1, Math.min(120, Math.round(Number(raw?.bookingLeadDays) || 14))),
     reminderTime: validTime(raw?.reminderTime),
+    pharmacyId: Number.isInteger(Number(raw?.pharmacyId)) && Number(raw?.pharmacyId) > 0 ? Number(raw.pharmacyId) : null,
+    fillDays: Math.max(1, Math.min(180, Math.round(Number(raw?.fillDays) || 30))),
   };
 }
 
@@ -48,28 +53,28 @@ LIMIT 1`, [userId, m.label]);
     return existing.rows[0].medication_id as number;
   }
   const med = await db.query(
-`INSERT INTO medications (user_id, display_label, days_supply_remaining, supply_as_of, reminder_time)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING medication_id`, [userId, m.label, m.daysSupplyRemaining, todayET(), m.reminderTime ?? null]);
+`INSERT INTO medications (user_id, display_label, days_supply_remaining, supply_as_of, reminder_time, pharmacy_id, fill_days, controlled)
+VALUES ($1, $2, $3, $4, $5, (SELECT ph.pharmacy_id FROM pharmacies ph WHERE ph.pharmacy_id = $6 AND ph.user_id = $1), $7, $8)
+RETURNING medication_id`, [userId, m.label, m.daysSupplyRemaining, todayET(), m.reminderTime ?? null, m.pharmacyId ?? null, m.fillDays, isScheduleII(m.label)]);
   await db.query(
 `INSERT INTO prescriptions (medication_id, refills_remaining, rx_expires_on, requires_appointment_for_renewal, booking_lead_days)
 VALUES ($1, $2, $3, $4, $5)`,
-    [med.rows[0].medication_id, m.refillsRemaining, m.rxExpiresOn || null, m.requiresAppointmentForRenewal, m.bookingLeadDays]);
+    [med.rows[0].medication_id, isScheduleII(m.label) ? 0 : m.refillsRemaining, m.rxExpiresOn || null, m.requiresAppointmentForRenewal, m.bookingLeadDays]);
   return med.rows[0].medication_id as number;
 }
 
 export async function updateMedication(userId: number, medicationId: number, m: MedInput, db: PoolClient | typeof pool = pool) {
   const r = await db.query(
 `UPDATE medications
-SET display_label = $3, days_supply_remaining = $4, supply_as_of = $5, reminder_time = $6
+SET display_label = $3, days_supply_remaining = $4, supply_as_of = $5, reminder_time = $6, pharmacy_id = (SELECT ph.pharmacy_id FROM pharmacies ph WHERE ph.pharmacy_id = $7 AND ph.user_id = $1), fill_days = $8, controlled = $9
 WHERE medication_id = $2
 AND user_id = $1
-RETURNING medication_id`, [userId, medicationId, m.label, m.daysSupplyRemaining, todayET(), m.reminderTime ?? null]);
+RETURNING medication_id`, [userId, medicationId, m.label, m.daysSupplyRemaining, todayET(), m.reminderTime ?? null, m.pharmacyId ?? null, m.fillDays, isScheduleII(m.label)]);
   if (!r.rowCount) return false;
   await db.query(
 `UPDATE prescriptions
 SET refills_remaining = $2, rx_expires_on = $3, requires_appointment_for_renewal = $4, booking_lead_days = $5
-WHERE medication_id = $1`, [medicationId, m.refillsRemaining, m.rxExpiresOn || null, m.requiresAppointmentForRenewal, m.bookingLeadDays]);
+WHERE medication_id = $1`, [medicationId, isScheduleII(m.label) ? 0 : m.refillsRemaining, m.rxExpiresOn || null, m.requiresAppointmentForRenewal, m.bookingLeadDays]);
   return true;
 }
 
@@ -166,4 +171,33 @@ export function etDateTime(day: string, hour: number, minute: number) {
     if (local === `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`) return d;
   }
   return new Date(`${day}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00-05:00`);
+}
+
+// "Picked up a refill": the countdown starts over. Leftover days carry over (except controlled medications, which
+// pharmacies won't fill early). Uses a refill if there was one; the "prescription sent" note is used up.
+export async function markRefilled(userId: number, medicationId: number) {
+  const r = await query(
+`UPDATE medications m
+SET days_supply_remaining = m.fill_days + CASE WHEN m.controlled THEN 0 ELSE GREATEST(0, (m.supply_as_of + m.days_supply_remaining) - $3::date) END,
+supply_as_of = $3::date,
+rx_sent_on = NULL
+WHERE m.medication_id = $2
+AND m.user_id = $1
+AND m.active
+RETURNING m.medication_id`, [userId, medicationId, todayET()]);
+  if (!r.length) return false;
+  await query(
+`UPDATE prescriptions
+SET refills_remaining = GREATEST(0, refills_remaining - 1)
+WHERE medication_id = $1`, [medicationId]);
+  return true;
+}
+
+// After a psychiatry visit: "Did they send your prescription?" Yes marks every medication that needed a renewal.
+export async function markRxSent(userId: number) {
+  await query(
+`UPDATE medications
+SET rx_sent_on = $2::date
+WHERE user_id = $1
+AND active`, [userId, todayET()]);
 }

@@ -9,7 +9,11 @@ export type MedTimeline = {
   daysLeft: number; visitDate?: string | null; supplyEndDate: string; refillDeadline: string; rxNeededBy: string;
   apptBy: string | null; bookApptBy: string | null; renewalReason: "no_refills" | "rx_expires" | "appointment_required" | null;
   status: "green" | "yellow" | "red"; nextAction: string; visitBooked: boolean;
+  requestRxBy?: string | null; controlled: boolean; fillDays: number; pharmacyId: number | null;
+  pharmacy: { name: string; phone: string | null } | null; rxSentOn: string | null;
 };
+
+export type Pharmacy = { pharmacy_id: number; pharmacy_name: string; phone: string | null; address: string | null; preferred: boolean };
 
 export type CareMember = {
   member_id: number; provider_name: string | null; source_site: string | null; role: string;
@@ -27,6 +31,9 @@ export type Me = {
   appointments: { slot_id: null; visit_id?: number; slot_start: string; duration_min: number; telehealth: boolean;
     provider_name: string; provider_type: string; specialty: string | null; recurring?: boolean; imported?: boolean; source?: "continuity" | "care_team" }[];
   careTeam: CareMember[];
+  pharmacies: Pharmacy[];
+  trusted: { contact_name: string; email: string } | null;
+  lastPsychVisit: { date: string; who: string | null } | null;
 };
 
 // Kept for older screens that only check "is someone signed in on this device?". The server uses the session cookie.

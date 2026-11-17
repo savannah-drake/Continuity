@@ -95,7 +95,10 @@ function Home() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-navy">{H.daysLeft(m.label, m.daysLeft)}</p>
                   <p className={`text-sm ${m.status === "green" ? "text-muted" : "text-attn-text"}`}>
-                    {needsVisit ? visitLine(m, me.today, H, fmtShort) : H.onTrack(fmtShort(m.supplyEndDate))}
+                    {m.rxSentOn ? H.rxSent(m.pharmacy?.name ?? null)
+                      : needsVisit ? visitLine(m, me.today, H, fmtShort)
+                      : m.nextAction === "request_rx" && m.requestRxBy ? H.requestRxBy(fmtShort(m.requestRxBy))
+                      : H.onTrack(fmtShort(m.supplyEndDate))}
                   </p>
                 </div>
                 {needsVisit && (
@@ -193,6 +196,10 @@ function Welcome() {
           <a href="/api/auth/google" className="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-line bg-white text-[15px] font-bold text-navy hover:bg-mist/40">
             <GoogleMark /> {A.google}
           </a>
+          <p className="flex justify-center gap-4 pt-2 text-xs text-muted">
+            <Link href="/privacy" className="underline">{COPY.profile.privacyLink}</Link>
+            <Link href="/terms" className="underline">{COPY.profile.termsLink}</Link>
+          </p>
         </div>
       </div>
     </Screen>

@@ -36,6 +36,10 @@ export async function GET(req: NextRequest) {
     },
     // Every active medication (the first one runs out soonest)
     all_medications: me.medications.map((x) => ({
+      controlled_new_prescription_each_fill: x.controlled,
+      pharmacy: x.pharmacy,
+      prescription_sent: !!x.rxSentOn,
+      ask_prescriber_by: x.nextAction === "request_rx" ? x.requestRxBy : null,
       nickname: x.label, days_left: x.daysLeft, runs_out: spokenDay(x.supplyEndDate),
       book_visit_by: x.visitBooked ? null : spokenDay(x.bookApptBy), daily_reminder_at: x.reminderTime,
     })),

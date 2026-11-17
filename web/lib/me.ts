@@ -9,6 +9,24 @@ const todayET = () => new Date().toLocaleDateString("en-CA", { timeZone: "Americ
 const dayET = (d: Date | string) => new Date(d).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 const WEEK = 7 * 24 * 3600 * 1000;
 
+export type Pharmacy = { pharmacy_id: number; pharmacy_name: string; phone: string | null; address: string | null; preferred: boolean };
+
+// The most recent psychiatry visit in the last 3 days (for "Did they send your prescription?")
+async function lastPsychVisit(userId: number, today: string) {
+  const [v] = await query<{ day: string; provider_name: string | null }>(
+`SELECT to_char(v.starts_at AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') AS day, c.provider_name
+FROM visits v
+JOIN care_team c ON c.member_id = v.member_id
+WHERE v.user_id = $1
+AND v.status = 'scheduled'
+AND c.role = 'psychiatrist'
+AND v.starts_at < now()
+AND v.starts_at > now() - interval '3 days'
+ORDER BY v.starts_at DESC
+LIMIT 1`, [userId]).catch(() => []);
+  return v && v.day <= today ? { date: v.day, who: v.provider_name } : null;
+}
+
 export type CareMember = {
   member_id: number; provider_name: string | null; source_site: string | null; role: string;
   phone: string | null; booking_url: string | null; video: boolean; notes: string | null;
@@ -52,7 +70,7 @@ WHERE u.user_id = $1`,
   if (!user) return null;
 
   const meds = await query(
-`SELECT m.medication_id, m.display_label, m.days_supply_remaining, to_char(m.supply_as_of, 'YYYY-MM-DD') AS supply_as_of, m.reminder_time, p.refills_remaining, to_char(p.rx_expires_on, 'YYYY-MM-DD') AS rx_expires_on, p.requires_appointment_for_renewal, p.booking_lead_days
+`SELECT m.medication_id, m.display_label, m.days_supply_remaining, to_char(m.supply_as_of, 'YYYY-MM-DD') AS supply_as_of, m.reminder_time, m.pharmacy_id, m.controlled, m.fill_days, to_char(m.rx_sent_on, 'YYYY-MM-DD') AS rx_sent_on, p.refills_remaining, to_char(p.rx_expires_on, 'YYYY-MM-DD') AS rx_expires_on, p.requires_appointment_for_renewal, p.booking_lead_days
 FROM medications m
 JOIN prescriptions p ON p.medication_id = m.medication_id
 WHERE m.user_id = $1
@@ -60,6 +78,17 @@ AND m.active
 ORDER BY m.supply_as_of + m.days_supply_remaining, m.medication_id`,
     [userId],
   );
+
+  // Pharmacies you use (one preferred) and your trusted person (before v6 SQL: none)
+  const pharmacies = await query<Pharmacy>(
+`SELECT ph.pharmacy_id, ph.pharmacy_name, ph.phone, ph.address, ph.preferred
+FROM pharmacies ph
+WHERE ph.user_id = $1
+ORDER BY ph.preferred DESC, ph.created_at`, [userId]).catch(() => [] as Pharmacy[]);
+  const [trusted] = await query<{ contact_name: string; email: string }>(
+`SELECT t.contact_name, t.email
+FROM trusted_contacts t
+WHERE t.user_id = $1`, [userId]).catch(() => []);
 
   // Your own providers and the visits you scheduled with them
   const careTeam = await query<CareMember>(
@@ -89,15 +118,21 @@ AND v.status = 'scheduled'`,
   ].sort((a, b) => String(a.slot_start).localeCompare(String(b.slot_start))).slice(0, 8);
 
   const medications = meds.map((m: any) => {
+    // You said the new prescription was sent during this supply: the renewal is done, next is picking it up
+    const rxSent = !!m.rx_sent_on && m.rx_sent_on >= m.supply_as_of;
     const t = computeTimeline(
-      { daysSupplyRemaining: m.days_supply_remaining, supplyAsOf: m.supply_as_of, refillsRemaining: m.refills_remaining,
-        rxExpiresOn: m.rx_expires_on, requiresAppointmentForRenewal: m.requires_appointment_for_renewal,
+      { daysSupplyRemaining: m.days_supply_remaining, supplyAsOf: m.supply_as_of,
+        refillsRemaining: rxSent ? Math.max(1, m.refills_remaining) : m.refills_remaining,
+        rxExpiresOn: rxSent ? null : m.rx_expires_on, requiresAppointmentForRenewal: rxSent ? false : m.requires_appointment_for_renewal,
+        newRxEachFill: !rxSent && !!m.controlled,
         bookingLeadDays: 14 }, // aim to book about two weeks before the visit deadline
       today,
     );
+    const pharmacy = pharmacies.find((p) => p.pharmacy_id === m.pharmacy_id) ?? pharmacies.find((p) => p.preferred) ?? null;
     // Never show a date that already passed. If the ideal book-by date is gone, it's "book now"; if the ideal visit
     // date is gone too, the goal becomes a visit before the supply runs out (or as soon as possible).
     if (t.bookApptBy && t.bookApptBy < today) t.bookApptBy = today;
+    if (t.requestRxBy && t.requestRxBy < today) t.requestRxBy = today;
     if (t.apptBy && t.apptBy < today) t.apptBy = t.supplyEndDate > today ? t.supplyEndDate : today;
     // A psychiatry visit on or before the appointment deadline satisfies the renewal step
     const psychVisit = t.apptBy
@@ -115,6 +150,11 @@ AND v.status = 'scheduled'`,
       ...t,
       visitBooked: !!psychVisit,
       visitDate: psychVisit ? dayET(psychVisit.slot_start) : null,
+      controlled: !!m.controlled,
+      fillDays: Number(m.fill_days ?? 30),
+      pharmacyId: (m.pharmacy_id as number | null) ?? null,
+      pharmacy: pharmacy ? { name: pharmacy.pharmacy_name, phone: pharmacy.phone } : null,
+      rxSentOn: rxSent ? (m.rx_sent_on as string) : null,
       nextAction: psychVisit ? "visit_booked" : t.nextAction,
       status: psychVisit ? "green" : t.status,
     };
@@ -131,7 +171,9 @@ AND v.status = 'scheduled'`,
   return {
     today, user, needsOnboarding: !user.insurance_plan,
     medication: medications[0] ?? null, // the one that runs out first (Home leads with it)
-    medications, therapy, appointments, careTeam,
+    medications, therapy, appointments, careTeam, pharmacies,
+    trusted: trusted ?? null,
+    lastPsychVisit: await lastPsychVisit(userId, today),
   };
 }
 

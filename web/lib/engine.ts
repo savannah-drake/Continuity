@@ -18,12 +18,13 @@ export type RxInput = {
   renewalTurnaroundDays?: number;      // prescriber sends a renewal after the visit (default 2)
   pharmacyProcessingDays?: number;     // pharmacy fills it (default 1)
   bookingLeadDays?: number;            // how far out the prescriber books (default 14)
+  newRxEachFill?: boolean;             // Schedule II: every fill needs a new prescription (ask, no visit unless required)
 };
 
 export type Status = "green" | "yellow" | "red";
 
 // Codes, not sentences: Ivy's copy deck (lib/copy.ts) turns these into words.
-export type NextAction = "book_today" | "book_appointment" | "request_refill" | "all_set";
+export type NextAction = "book_today" | "book_appointment" | "request_refill" | "request_rx" | "all_set";
 export type RenewalReason = "no_refills" | "rx_expires" | "appointment_required" | null;
 
 export type Timeline = {
@@ -34,6 +35,7 @@ export type Timeline = {
   renewalReason: RenewalReason;
   apptBy: string | null;               // appointment must happen by
   bookApptBy: string | null;           // must be booked by
+  requestRxBy?: string | null;         // ask the prescriber for a new prescription by (Schedule II, no visit needed)
   daysUntilAction: number;             // days until the most urgent deadline (negative = overdue)
   status: Status;
   nextAction: NextAction;
@@ -87,6 +89,18 @@ export function computeTimeline(rx: RxInput, today: string): Timeline {
       daysUntilAction,
       status: statusFor(daysUntilAction),
       nextAction: daysUntilAction <= 7 ? "request_refill" : "all_set",
+    };
+  }
+
+  if (rx.newRxEachFill && !rx.requiresAppointmentForRenewal) {
+    const requestRxBy = shiftWeekendBack(addDays(rxNeededBy, -turnaround));
+    const daysUntilAction = diffDays(today, requestRxBy);
+    return {
+      supplyEndDate, refillDeadline, rxNeededBy,
+      needsRenewal, renewalReason, apptBy: null, bookApptBy: null, requestRxBy,
+      daysUntilAction,
+      status: statusFor(daysUntilAction),
+      nextAction: daysUntilAction <= 7 ? "request_rx" : "all_set",
     };
   }
 
