@@ -8,7 +8,9 @@ const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 // The browser wants the public key as bytes
 function keyBytes(b64: string) {
   const s = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+  const out = new Uint8Array(new ArrayBuffer(s.length)); // a plain ArrayBuffer, which pushManager.subscribe requires
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
 }
 
 export function AlertSettings({ emailOn: initialEmail, email }: { emailOn: boolean; email: string | null }) {
