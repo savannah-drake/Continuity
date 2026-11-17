@@ -24,40 +24,66 @@ async function fetchNpi(params: Record<string, string>) {
   return res.json().catch(() => null);
 }
 
-async function query(postal: string): Promise<PharmacyHit[]> {
-  let data = await fetchNpi({ postal_code: postal, address_purpose: "LOCATION" });
-  if (data?.Errors) {
-    console.error("pharmacy search rejected", JSON.stringify(data.Errors).slice(0, 200));
-    data = await fetchNpi({ postal_code: postal }); // older behavior: match any address, filtered to the location below
-  }
+// Every walk-in pharmacy whose store ZIP starts with this prefix (the registry allows "303*"; up to 600 here)
+async function npiArea(prefix: string): Promise<PharmacyHit[]> {
   const out: PharmacyHit[] = [];
-  for (const r of data?.results ?? []) {
-    const tax = (r.taxonomies ?? []).find((t: any) => t.primary) ?? r.taxonomies?.[0];
-    if (!tax || !WALK_IN.has(tax.code)) continue;
-    const loc = (r.addresses ?? []).find((a: any) => a.address_purpose === "LOCATION");
-    if (!loc || loc.country_code !== "US") continue;
-    const dba = (r.other_names ?? []).find((o: any) => /business as/i.test(o.type ?? "") && o.organization_name)?.organization_name;
-    const name = title(dba || r.basic?.organization_name || "");
-    if (!name) continue;
-    const zip = String(loc.postal_code ?? "").slice(0, 5);
-    if (!zip.startsWith(postal.replace("*", ""))) continue; // the store itself has to be in the area searched
-    out.push({
-      npi: String(r.number), name, zip, phone: phoneFmt(loc.telephone_number),
-      address: title([loc.address_1, loc.address_2].filter(Boolean).join(" ")) + `, ${title(loc.city ?? "")}, ${loc.state} ${zip}`,
-    });
+  for (let skip = 0; skip <= 400; skip += 200) {
+    const data = await fetchNpi({ postal_code: `${prefix}*`, skip: String(skip) });
+    if (data?.Errors) { console.error("pharmacy search rejected", JSON.stringify(data.Errors).slice(0, 200)); break; }
+    const results = data?.results ?? [];
+    for (const r of results) {
+      const tax = (r.taxonomies ?? []).find((t: any) => t.primary) ?? r.taxonomies?.[0];
+      if (!tax || !WALK_IN.has(tax.code)) continue;
+      const loc = (r.addresses ?? []).find((a: any) => a.address_purpose === "LOCATION");
+      if (!loc || loc.country_code !== "US") continue;
+      const zip = String(loc.postal_code ?? "").slice(0, 5);
+      if (!zip.startsWith(prefix)) continue; // the store itself has to be in the area
+      const dba = (r.other_names ?? []).find((o: any) => /business as/i.test(o.type ?? "") && o.organization_name)?.organization_name;
+      const name = title(dba || r.basic?.organization_name || "");
+      if (!name) continue;
+      out.push({
+        npi: String(r.number), name, zip, phone: phoneFmt(loc.telephone_number),
+        address: title([loc.address_1, loc.address_2].filter(Boolean).join(" ")) + `, ${title(loc.city ?? "")}, ${loc.state} ${zip}`,
+      });
+    }
+    if (results.length < 200) break;
   }
   return out;
 }
 
-async function npiNear(zip: string, max = 25) {
-  if (!/^\d{5}$/.test(zip)) return [];
-  const exact = await query(`${zip}*`);
-  const nearby = exact.length >= max ? [] : await query(`${zip.slice(0, 4)}*`);
-  const seen = new Set<string>();
-  return [...exact, ...nearby]
-    .filter((p) => !seen.has(p.npi) && seen.add(p.npi))
-    .sort((a, b) => Math.abs(Number(a.zip) - Number(zip)) - Math.abs(Number(b.zip) - Number(zip)) || a.name.localeCompare(b.name))
+const zipCoords = async (zip: string): Promise<[number, number] | null> => {
+  return zipCoords(zip);
+};
+const milesBetween = (a: [number, number], b: [number, number]) => {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(b[0] - a[0]) / 2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(rad(b[1] - a[1]) / 2) ** 2;
+  return Math.round(3958.8 * 2 * Math.asin(Math.sqrt(h)) * 10) / 10;
+};
+
+// An area Typesense doesn't have yet: ask the registry, place each store at its ZIP's center, list closest first,
+// and save the area into Typesense (when the admin key is set) so the next search there is instant.
+async function npiNear(zip: string, center: [number, number] | null, max = 25) {
+  const area = await npiArea(zip.slice(0, 3));
+  const zips = [...new Set(area.map((p) => p.zip))].slice(0, 40);
+  const coords = new Map(await Promise.all(zips.map(async (z) => [z, await zipCoords(z)] as const)));
+  for (const p of area) {
+    const c = coords.get(p.zip);
+    if (c && center) p.miles = milesBetween(center, c);
+  }
+  cacheArea(area, coords).catch(() => {});
+  return area
+    .sort((a, b) => (a.miles ?? Math.abs(Number(a.zip) - Number(zip))) - (b.miles ?? Math.abs(Number(b.zip) - Number(zip))) || a.name.localeCompare(b.name))
     .slice(0, max);
+}
+
+async function cacheArea(area: PharmacyHit[], coords: Map<string, [number, number] | null>) {
+  if (!process.env.TYPESENSE_ADMIN_KEY) return;
+  const { typesenseAdmin } = await import("./typesense");
+  const docs = area.filter((p) => coords.get(p.zip)).map((p) => {
+    const [street, city, stateZip] = p.address.split(", ");
+    return { id: p.npi, name: p.name, street, city: city ?? "", state: (stateZip ?? "").split(" ")[0], zip: p.zip, phone: p.phone ?? "", chain: "", location: coords.get(p.zip)! };
+  });
+  if (docs.length) await typesenseAdmin.collections("pharmacies").documents().import(docs, { action: "emplace" });
 }
 
 // Center point for a ZIP: from a pharmacy we already have in that ZIP, else the free ZIP lookup
@@ -67,9 +93,7 @@ async function zipCenter(zip: string): Promise<[number, number] | null> {
     const loc = r.hits?.[0]?.document?.location;
     if (loc) return [loc[0], loc[1]];
   } catch { /* not loaded */ }
-  const z = await fetch(`https://api.zippopotam.us/us/${zip}`, { next: { revalidate: 30 * 24 * 3600 } } as RequestInit).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-  const p = z?.places?.[0];
-  return p ? [Number(p.latitude), Number(p.longitude)] : null;
+  return zipCoords(zip);
 }
 
 async function typesenseNear(lat: number, lng: number, q: string, max: number): Promise<PharmacyHit[] | null> {
@@ -99,8 +123,8 @@ export async function pharmaciesNear(opts: { zip?: string | null; lat?: number |
     const hits = await typesenseNear(center[0], center[1], q, max);
     if (hits && hits.length) return hits;
   }
-  // Nothing loaded for this area: ask the registry directly (by ZIP only), filtering by the search words here
+  // Nothing loaded for this area yet: ask the registry directly (by ZIP), filtering by the search words here
   if (!zip) return [];
   const words = q.toLowerCase();
-  return (await npiNear(zip, 60)).filter((p) => !words || p.name.toLowerCase().includes(words) || p.address.toLowerCase().includes(words)).slice(0, max);
+  return (await npiNear(zip, center as [number, number] | null, 200)).filter((p) => !words || p.name.toLowerCase().includes(words) || p.address.toLowerCase().includes(words)).slice(0, max);
 }

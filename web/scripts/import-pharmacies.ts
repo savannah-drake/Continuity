@@ -5,13 +5,16 @@
 // Run from the web folder (needs internet, a few minutes for Georgia):
 //   npx tsx --env-file=.env.local scripts/import-pharmacies.ts                 # Georgia (default)
 //   npx tsx --env-file=.env.local scripts/import-pharmacies.ts --zips=606,607  # add areas by ZIP prefix (here: Chicago)
+//   npx tsx --env-file=.env.local scripts/import-pharmacies.ts --all           # the whole US (~60k stores, about an hour)
 // Safe to re-run: pharmacies are upserted by NPI. Add --reset to drop and rebuild the collection.
 import { typesenseAdmin } from "../lib/typesense";
 
 const NAME = "pharmacies";
 const GEORGIA = [...Array.from({ length: 20 }, (_, i) => String(300 + i)), "398", "399"];
 const arg = (k: string) => process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1];
-const PREFIXES = arg("zips")?.split(",").map((s) => s.trim()).filter((s) => /^\d{3,5}$/.test(s)) ?? GEORGIA;
+const ALL = Array.from({ length: 995 }, (_, i) => String(i + 5).padStart(3, "0")); // every US ZIP area 005-999
+const PREFIXES = process.argv.includes("--all") ? ALL
+  : arg("zips")?.split(",").map((s) => s.trim()).filter((s) => /^\d{3,5}$/.test(s)) ?? GEORGIA;
 const WALK_IN = new Set(["3336C0003X", "333600000X", "3336C0004X", "3336C0002X"]);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
