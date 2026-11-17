@@ -32,7 +32,7 @@ WHERE p.user_id = $1`, [userId]);
       if (e?.statusCode === 404 || e?.statusCode === 410) await query(
 `DELETE FROM push_subscriptions
 WHERE endpoint = $1`, [s.endpoint]);
-      else console.error("push failed", e?.statusCode || e);
+      else console.error("push failed", e?.statusCode || e, String(e?.body ?? "").slice(0, 300));
     }
   }
   return sent;
