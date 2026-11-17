@@ -1,5 +1,5 @@
 // /api/pharmacies (signed in): the pharmacies you use. The first one you add is preferred.
-// POST {name, phone?, address?}   PATCH {pharmacyId, preferred: true}   DELETE ?id=3
+// POST {name, phone?, address?}   PATCH {pharmacyId, preferred: true} or {pharmacyId, name, phone?, address?}   DELETE ?id=3
 import type { NextRequest } from "next/server";
 import { getSessionUserId, unauthorizedJson } from "@/lib/session";
 import { query } from "@/lib/db";
@@ -25,7 +25,19 @@ export async function PATCH(req: Request) {
   if (!userId) return unauthorizedJson();
   const b = await req.json().catch(() => null);
   const id = Number(b?.pharmacyId);
-  if (!Number.isInteger(id) || b?.preferred !== true) return Response.json({ error: "bad_request" }, { status: 400 });
+  if (!Number.isInteger(id)) return Response.json({ error: "bad_request" }, { status: 400 });
+  if (b?.preferred !== true) {
+    // Edit the details
+    const name = text(b?.name, 80);
+    if (!name) return Response.json({ error: "need_name" }, { status: 400 });
+    const phone = text(b?.phone, 30)?.replace(/[^\d+()\-. ]/g, "") || null;
+    await query(
+`UPDATE pharmacies
+SET pharmacy_name = $3, phone = $4, address = $5
+WHERE pharmacy_id = $2
+AND user_id = $1`, [userId, id, name, phone, text(b?.address, 160)]);
+    return Response.json({ ok: true });
+  }
   await query(
 `UPDATE pharmacies
 SET preferred = (pharmacy_id = $2)

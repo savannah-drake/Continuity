@@ -45,7 +45,14 @@ export default function CarePage() {
   const [findKind, setFindKind] = useState<"psychiatrist" | "therapist">("psychiatrist");
   const [findPlan, setFindPlan] = useState<string | null>(null);
   const [askBooked, setAskBooked] = useState<number | null>(null);
-  const [pharmForm, setPharmForm] = useState<null | { name: string; phone: string; address: string }>(null);
+  const [pharmForm, setPharmForm] = useState<null | { id?: number; name: string; phone: string; address: string }>(null);
+  // Pharmacy search near your ZIP (CMS NPI Registry)
+  const [pharmSearch, setPharmSearch] = useState<null | { zip: string; q: string; loading: boolean; results: { npi: string; name: string; address: string; phone: string | null }[] }>(null);
+  async function searchPharmacies(zip?: string) {
+    setPharmSearch((s) => ({ zip: zip ?? s?.zip ?? "", q: s?.q ?? "", loading: true, results: s?.results ?? [] }));
+    const d = await fetch(`/api/pharmacies/search${zip ? `?zip=${zip}` : ""}`).then((r) => r.json()).catch(() => ({ pharmacies: [] }));
+    setPharmSearch((s) => ({ zip: d.zip ?? zip ?? "", q: s?.q ?? "", loading: false, results: d.pharmacies ?? [] }));
+  }
   const [personEdit, setPersonEdit] = useState<null | { id: number; d: PersonDraft }>(null);
   // Check-ins: "Did you pick up your refill?" and, after a psychiatry visit, "Did they send your prescription?"
   const [hidden, setHidden] = useState<string[]>([]);
@@ -189,6 +196,10 @@ export default function CarePage() {
                   {m.pharmacy && (
                     <p className="text-xs text-muted">{K.medPharmacy}: {m.pharmacy.name}
                       {m.pharmacy.phone && <a href={`tel:${m.pharmacy.phone}`} className="ml-2 font-semibold text-brand" aria-label={K.callPharmacy(m.pharmacy.name)}>{K.call}</a>}
+                      {/* An online refill only works when there's a refill left (never for controlled medications) */}
+                      {m.pharmacy.refillUrl && !m.controlled && (m.refillsRemaining > 0 || !!m.rxSentOn) && (
+                        <a href={m.pharmacy.refillUrl} target="_blank" rel="noopener noreferrer" className="ml-2 font-semibold text-brand">{K.refillOnline}</a>
+                      )}
                     </p>
                   )}
                   {m.controlled && <p className="text-xs text-muted">{K.controlledNote}</p>}
@@ -214,8 +225,47 @@ export default function CarePage() {
       </Section>
 
       {/* Pharmacies */}
-      <Section title={K.pharmacies} action={!pharmForm && <button className={linkBtn} onClick={() => setPharmForm({ name: "", phone: "", address: "" })}><PlusIcon size={16} />{K.addPharmacy}</button>}>
-        {me.pharmacies.length === 0 && !pharmForm && <p className="text-sm text-muted">{K.pharmaciesEmpty}</p>}
+      <Section title={K.pharmacies} action={!pharmForm && !pharmSearch && <button className={linkBtn} onClick={() => searchPharmacies()}><PlusIcon size={16} />{K.addPharmacy}</button>}>
+        {me.pharmacies.length === 0 && !pharmForm && !pharmSearch && <p className="text-sm text-muted">{K.pharmaciesEmpty}</p>}
+        {pharmSearch && (
+          <div className="mt-3 rounded-2xl border border-line bg-white p-4">
+            <div className="mb-3 grid grid-cols-[1fr_7rem] gap-2">
+              <input className={inputClass} aria-label={K.pharmacyFilter} placeholder={K.pharmacyFilter} value={pharmSearch.q}
+                onChange={(e) => setPharmSearch({ ...pharmSearch, q: e.target.value })} />
+              <input className={inputClass} aria-label={K.pharmacyZip} inputMode="numeric" maxLength={5} placeholder="ZIP" value={pharmSearch.zip}
+                onChange={(e) => { const z = e.target.value.replace(/\D/g, "").slice(0, 5); setPharmSearch({ ...pharmSearch, zip: z }); if (z.length === 5) searchPharmacies(z); }} />
+            </div>
+            {pharmSearch.loading ? <p className="text-sm text-muted">{K.pharmacySearching}</p> : (() => {
+              const q = pharmSearch.q.trim().toLowerCase();
+              const list = pharmSearch.results.filter((p) => !q || p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
+              const saved = new Set(me.pharmacies.map((p) => p.pharmacy_name.toLowerCase() + "|" + (p.address ?? "").toLowerCase()));
+              return list.length === 0 ? <p className="text-sm text-muted">{K.pharmacyNone(pharmSearch.zip)}</p> : (
+                <>
+                  <p className="mb-2 text-xs text-muted">{K.pharmacyNear(pharmSearch.zip)}</p>
+                  <ul className="max-h-80 divide-y divide-line overflow-y-auto">
+                    {list.map((p) => (
+                      <li key={p.npi} className="flex items-center gap-3 py-2.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-navy">{p.name}</p>
+                          <p className="truncate text-xs text-muted">{p.address}{p.phone ? ` · ${p.phone}` : ""}</p>
+                        </div>
+                        {saved.has(p.name.toLowerCase() + "|" + p.address.toLowerCase())
+                          ? <span className="shrink-0 text-xs text-muted">{K.pharmacyAdded}</span>
+                          : <button className="shrink-0 text-sm font-semibold text-brand" disabled={busy}
+                              onClick={() => send("/api/pharmacies", "POST", { name: p.name, phone: p.phone, address: p.address })}>{K.addPharmacy}</button>}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              );
+            })()}
+            <div className="mt-3 flex gap-5 text-sm font-semibold">
+              <button className="text-brand" onClick={() => { setPharmSearch(null); setPharmForm({ name: "", phone: "", address: "" }); }}>{K.pharmacyManual}</button>
+              <button className="text-muted" onClick={() => setPharmSearch(null)}>{K.done}</button>
+            </div>
+            <p className="mt-2 text-[11px] text-muted">{K.pharmacySource}</p>
+          </div>
+        )}
         {me.pharmacies.length > 0 && (
           <ul className={rowList}>
             {me.pharmacies.map((p) => (
@@ -227,6 +277,7 @@ export default function CarePage() {
                 <div className="flex shrink-0 items-center gap-4 text-sm">
                   {p.phone && <a href={`tel:${p.phone}`} className={linkBtn} aria-label={K.callPharmacy(p.pharmacy_name)}><PhoneIcon size={16} /></a>}
                   {!p.preferred && <button className="font-semibold text-brand" disabled={busy} onClick={() => send("/api/pharmacies", "PATCH", { pharmacyId: p.pharmacy_id, preferred: true })}>{K.makePreferred}</button>}
+                  <button className="font-semibold text-brand" onClick={() => { setPharmSearch(null); setPharmForm({ id: p.pharmacy_id, name: p.pharmacy_name, phone: p.phone ?? "", address: p.address ?? "" }); }}>{K.edit}</button>
                   <button className="text-muted" disabled={busy} onClick={() => send(`/api/pharmacies?id=${p.pharmacy_id}`, "DELETE")}>{K.remove}</button>
                 </div>
               </li>
@@ -237,7 +288,10 @@ export default function CarePage() {
           <form className="mt-3 space-y-4 rounded-2xl border border-line bg-white p-4" onSubmit={async (e) => {
             e.preventDefault();
             if (!pharmForm.name.trim()) return;
-            if (await send("/api/pharmacies", "POST", pharmForm)) setPharmForm(null);
+            const ok = pharmForm.id
+              ? await send("/api/pharmacies", "PATCH", { pharmacyId: pharmForm.id, name: pharmForm.name, phone: pharmForm.phone, address: pharmForm.address })
+              : await send("/api/pharmacies", "POST", pharmForm);
+            if (ok) setPharmForm(null);
           }}>
             <Field label={K.pharmacyName}><input className={inputClass} value={pharmForm.name} onChange={(e) => setPharmForm({ ...pharmForm, name: e.target.value })} placeholder="CVS Pharmacy, N Decatur Rd" /></Field>
             <Field label={K.pharmacyPhone}><input className={inputClass} type="tel" value={pharmForm.phone} onChange={(e) => setPharmForm({ ...pharmForm, phone: e.target.value })} /></Field>

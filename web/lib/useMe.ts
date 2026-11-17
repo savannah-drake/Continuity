@@ -10,7 +10,7 @@ export type MedTimeline = {
   apptBy: string | null; bookApptBy: string | null; renewalReason: "no_refills" | "rx_expires" | "appointment_required" | null;
   status: "green" | "yellow" | "red"; nextAction: string; visitBooked: boolean;
   requestRxBy?: string | null; controlled: boolean; fillDays: number; pharmacyId: number | null;
-  pharmacy: { name: string; phone: string | null } | null; rxSentOn: string | null;
+  pharmacy: { name: string; phone: string | null; refillUrl: string | null } | null; rxSentOn: string | null;
 };
 
 export type Pharmacy = { pharmacy_id: number; pharmacy_name: string; phone: string | null; address: string | null; preferred: boolean };

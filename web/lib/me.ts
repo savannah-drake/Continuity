@@ -3,6 +3,7 @@
 // v2: every active medication gets its own timeline (Home leads with whichever runs out first),
 // plus your care team and upcoming visits (one-off or recurring).
 import { query } from "./db";
+import { refillUrl } from "./refillLinks";
 import { computeTimeline, computeTherapyTimeline, diffDays } from "./engine";
 
 const todayET = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
@@ -153,7 +154,7 @@ AND v.status = 'scheduled'`,
       controlled: !!m.controlled,
       fillDays: Number(m.fill_days ?? 30),
       pharmacyId: (m.pharmacy_id as number | null) ?? null,
-      pharmacy: pharmacy ? { name: pharmacy.pharmacy_name, phone: pharmacy.phone } : null,
+      pharmacy: pharmacy ? { name: pharmacy.pharmacy_name, phone: pharmacy.phone, refillUrl: refillUrl(pharmacy.pharmacy_name) } : null,
       rxSentOn: rxSent ? (m.rx_sent_on as string) : null,
       nextAction: psychVisit ? "visit_booked" : t.nextAction,
       status: psychVisit ? "green" : t.status,
